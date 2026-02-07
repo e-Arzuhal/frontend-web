@@ -1,38 +1,57 @@
 import React from 'react';
 import { colors, fonts, radius, transitions } from '../../styles/tokens';
 
-const NavIcon = ({ src, size = 18 }) => {
-  // SVG/PNG ikonlarınızı "tek renk" olarak currentColor ile boyamak için:
-  // - SVG önerilir (şeffaf arka plan, tek renk şekil)
-  return (
-    <span
-      aria-hidden
-      style={{
-        width: size,
-        height: size,
-        display: 'inline-block',
-        flex: '0 0 auto',
-        backgroundColor: 'currentColor',
-        WebkitMaskImage: `url(${src})`,
-        WebkitMaskRepeat: 'no-repeat',
-        WebkitMaskPosition: 'center',
-        WebkitMaskSize: 'contain',
-        maskImage: `url(${src})`,
-        maskRepeat: 'no-repeat',
-        maskPosition: 'center',
-        maskSize: 'contain',
-        opacity: 0.95,
-      }}
-    />
-  );
+const Icon = ({ name, size = 20 }) => {
+  const common = {
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    xmlns: 'http://www.w3.org/2000/svg',
+    style: { display: 'block' },
+  };
+  const stroke = { stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+
+  switch (name) {
+    case 'dashboard':
+      return (
+        <svg {...common} aria-hidden>
+          <path {...stroke} d="M4 4h7v7H4V4zM13 4h7v4h-7V4zM13 10h7v10h-7V10zM4 13h7v7H4v-7z" />
+        </svg>
+      );
+    case 'create':
+      return (
+        <svg {...common} aria-hidden>
+          <path {...stroke} d="M12 5v14M5 12h14" />
+          <path {...stroke} d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" />
+        </svg>
+      );
+    case 'contracts':
+      return (
+        <svg {...common} aria-hidden>
+          <path {...stroke} d="M7 3h7l3 3v15a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+          <path {...stroke} d="M14 3v4a2 2 0 0 0 2 2h4" />
+          <path {...stroke} d="M8 12h8M8 16h8" />
+        </svg>
+      );
+    case 'approvals':
+      return (
+        <svg {...common} aria-hidden>
+          <path {...stroke} d="M9 12l2 2 4-4" />
+          <path {...stroke} d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" />
+        </svg>
+      );
+    default:
+      return null;
+  }
 };
 
 const Sidebar = ({ currentPage, onPageChange }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Genel Bakış', iconSrc: '/icons/dashboard.svg' },
-    { id: 'create', label: 'Yeni Sözleşme', iconSrc: '/icons/create.svg' },
-    { id: 'contracts', label: 'Sözleşmelerim', iconSrc: '/icons/contracts.svg' },
-    { id: 'approvals', label: 'Onay Bekleyenler', iconSrc: '/icons/approvals.svg' },
+    { id: 'dashboard', label: 'Genel Bakış', icon: 'dashboard' },
+    { id: 'create', label: 'Yeni Sözleşme', icon: 'create' },
+    { id: 'contracts', label: 'Sözleşmelerim', icon: 'contracts' },
+    { id: 'approvals', label: 'Onay Bekleyenler', icon: 'approvals' },
   ];
 
   return (
@@ -94,7 +113,18 @@ const Sidebar = ({ currentPage, onPageChange }) => {
                 textAlign: 'left',
               }}
             >
-              <NavIcon src={item.iconSrc} />
+              <span
+                style={{
+                  width: 22,
+                  height: 22,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flex: '0 0 auto',
+                }}
+              >
+                <Icon name={item.icon} />
+              </span>
               {item.label}
             </button>
           );
