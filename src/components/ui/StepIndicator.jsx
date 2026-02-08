@@ -1,6 +1,12 @@
 import React from 'react';
 import { colors, fonts } from '../../styles/tokens';
 
+const StepCheck = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
+    <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const StepIndicator = ({ steps, currentStep = 0 }) => {
   return (
     <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
@@ -26,7 +32,7 @@ const StepIndicator = ({ steps, currentStep = 0 }) => {
                 color: isCompleted || isCurrent ? '#fff' : colors.textMuted,
                 border: isCurrent ? `2px solid ${colors.accentLight}` : 'none',
               }}>
-                {isCompleted ? '✓' : index + 1}
+                {isCompleted ? <StepCheck /> : index + 1}
               </div>
               <span style={{
                 fontSize: '12px',

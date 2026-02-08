@@ -10,8 +10,8 @@ const ApprovalsPage = () => {
   ];
 
   return (
-    <div style={{ animation: 'fadeInUp 0.4s ease' }}>
-      <TopBar title="Onay Bekleyen Sözleşmeler" subtitle={`${pending.length} sözleşme onayınızı bekliyor`} />
+    <div style={{ animation: 'fadeInUp 0.35s ease' }}>
+      <TopBar title="Onay Bekleyenler" subtitle={`${pending.length} sözleşme onayınızı bekliyor`} />
 
       <div style={{ padding: '28px 32px' }}>
         {pending.map(p => (
