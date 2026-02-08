@@ -1,7 +1,18 @@
 import React from 'react';
 import { colors, radius, fonts, transitions } from '../../styles/tokens';
 
-const Button = ({ children, variant = 'primary', size = 'md', icon, disabled, loading, onClick, style }) => {
+const Button = ({
+  children,
+  variant = 'primary',
+  size = 'md',
+  icon,
+  disabled,
+  loading,
+  onClick,
+  style,
+  fullWidth,
+  type = 'button',
+}) => {
   const sizes = {
     sm: { padding: '8px 16px', fontSize: '13px' },
     md: { padding: '10px 20px', fontSize: '14px' },
@@ -21,6 +32,7 @@ const Button = ({ children, variant = 'primary', size = 'md', icon, disabled, lo
     alignItems: 'center',
     justifyContent: 'center',
     gap: '8px',
+    width: fullWidth ? '100%' : undefined,
     fontFamily: fonts.body,
     fontWeight: 600,
     borderRadius: radius.md,
@@ -34,11 +46,12 @@ const Button = ({ children, variant = 'primary', size = 'md', icon, disabled, lo
 
   return (
     <button
+      type={type}
       disabled={disabled || loading}
       onClick={disabled || loading ? undefined : onClick}
       style={baseStyle}
-      onMouseEnter={(e) => { if (!disabled && !loading) e.target.style.transform = 'translateY(-1px)'; }}
-      onMouseLeave={(e) => { e.target.style.transform = 'translateY(0)'; }}
+      onMouseEnter={(e) => { if (!disabled && !loading) e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
     >
       {loading ? <span style={{ width: 16, height: 16, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : icon}
       {children}

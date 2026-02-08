@@ -1,7 +1,22 @@
 import React, { useState } from 'react';
 import { colors, radius, fonts, shadows, transitions } from '../../styles/tokens';
 
-const Input = ({ label, placeholder, value, onChange, error, icon, disabled, required }) => {
+const Input = ({
+  label,
+  placeholder,
+  value,
+  onChange,
+  error,
+  icon,
+  disabled,
+  required,
+  type = 'text',
+  name,
+  autoComplete,
+  inputMode,
+  maxLength,
+  iconBoxed = false,
+}) => {
   const [isFocused, setIsFocused] = useState(false);
 
   return (
@@ -22,12 +37,39 @@ const Input = ({ label, placeholder, value, onChange, error, icon, disabled, req
         boxShadow: isFocused ? shadows.glow : 'none',
         transition: `all ${transitions.base}`,
       }}>
-        {icon && <span style={{ color: colors.textMuted }}>{icon}</span>}
+        {icon && (
+          iconBoxed ? (
+            <span
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: radius.sm,
+                background: colors.surfaceAlt,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: colors.textMuted,
+                flex: '0 0 auto',
+              }}
+            >
+              {icon}
+            </span>
+          ) : (
+            <span style={{ color: colors.textMuted, display: 'inline-flex' }}>{icon}</span>
+          )
+        )}
+
         <input
+          type={type}
+          name={name}
+          autoComplete={autoComplete}
+          inputMode={inputMode}
+          maxLength={maxLength}
           placeholder={placeholder}
           value={value}
           onChange={onChange}
           disabled={disabled}
+          required={required}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           style={{

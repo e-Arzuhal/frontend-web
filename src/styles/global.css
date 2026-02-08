@@ -2,17 +2,81 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+html { scroll-behavior: smooth; }
+
+/* Theme tokens (Light defaults) */
+:root{
+  --color-primary: #1B2A4A;
+  --color-primaryLight: #2D4272;
+  --color-primaryDark: #0F1A30;
+
+  --color-accent: #C8963E;
+  --color-accentLight: #E8C882;
+  --color-accentMuted: rgba(200, 150, 62, 0.12);
+
+  --color-surface: #FAFBFD;
+  --color-surfaceAlt: #F0F2F7;
+  --color-card: #FFFFFF;
+
+  --color-text: #1B2A4A;
+  --color-textSecondary: #6B7A96;
+  --color-textMuted: #9CA8BC;
+  --color-textInverse: #FFFFFF;
+
+  --color-border: #E2E6EE;
+  --color-borderFocus: #C8963E;
+
+  --color-success: #2D8B55;
+  --color-successBg: #E8F5EE;
+  --color-warning: #D4880F;
+  --color-warningBg: #FFF7E6;
+  --color-error: #C0392B;
+  --color-errorBg: #FDE8E5;
+  --color-info: #2980B9;
+  --color-infoBg: #E8F1FA;
+}
+
+/* Dark theme overrides */
+body[data-theme="dark"]{
+  color-scheme: dark;
+
+  --color-surface: #0F1A30;
+  --color-surfaceAlt: rgba(255,255,255,0.10);
+  --color-card: rgba(255,255,255,0.08);
+
+  --color-text: #FAFBFD;
+  --color-textSecondary: rgba(250,251,253,0.82);
+  --color-textMuted: rgba(250,251,253,0.64);
+  --color-textInverse: #0F1A30;
+
+  --color-border: rgba(255,255,255,0.16);
+  --color-borderFocus: #E8C882;
+
+  --color-accentMuted: rgba(200, 150, 62, 0.20);
+
+  /* (Opsiyonel) durum renkleri koyu zeminde daha okunur */
+  --color-successBg: rgba(45, 139, 85, 0.18);
+  --color-warningBg: rgba(212, 136, 15, 0.18);
+  --color-errorBg: rgba(192, 57, 43, 0.18);
+  --color-infoBg: rgba(41, 128, 185, 0.18);
+}
+
 body {
   font-family: 'DM Sans', 'Segoe UI', sans-serif;
-  color: #1B2A4A;
-  background: #FAFBFD;
+  color: var(--color-text);
+  background: var(--color-surface);
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
 }
 
 ::selection {
   background: rgba(200, 150, 62, 0.2);
-  color: #1B2A4A;
+  color: var(--color-text);
+}
+
+/* Motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
 }
 
 @keyframes fadeInUp {

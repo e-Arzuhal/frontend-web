@@ -33,8 +33,12 @@ const ContractsPage = () => {
   });
 
   return (
-    <div style={{ animation: 'fadeInUp 0.4s ease' }}>
-      <TopBar title="Sözleşmelerim" subtitle={`Toplam ${contracts.length} sözleşme`} actions={<Button variant="accent">Yeni Sözleşme</Button>} />
+    <div style={{ animation: 'fadeInUp 0.35s ease' }}>
+      <TopBar
+        title="Sözleşmelerim"
+        subtitle={`Toplam ${contracts.length} sözleşme`}
+        actions={<Button variant="accent">Yeni Sözleşme</Button>}
+      />
 
       <div style={{ padding: '28px 32px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -60,7 +64,7 @@ const ContractsPage = () => {
             ))}
           </div>
           <div style={{ width: '280px' }}>
-            <Input placeholder="Ara" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            <Input placeholder="Ara..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
         </div>
 
@@ -78,10 +82,14 @@ const ContractsPage = () => {
               <Badge>{c.type}</Badge>
               <span style={{ fontWeight: 500 }}>{c.amount}</span>
               <Badge variant={statusConfig[c.status].variant}>{statusConfig[c.status].label}</Badge>
-              <Button variant="ghost" size="sm">Gör</Button>
+              <Button variant="ghost" size="sm">Görüntüle</Button>
             </div>
           ))}
-          {filtered.length === 0 && <div style={{ padding: '48px', textAlign: 'center', color: colors.textMuted }}>Sonuç bulunamadı.</div>}
+          {filtered.length === 0 && (
+            <div style={{ padding: '48px', textAlign: 'center', color: colors.textMuted }}>
+              Sonuç bulunamadı.
+            </div>
+          )}
         </Card>
       </div>
     </div>

@@ -24,7 +24,7 @@ const DashboardPage = ({ onNavigate }) => {
   };
 
   return (
-    <div style={{ animation: 'fadeInUp 0.4s ease' }}>
+    <div style={{ animation: 'fadeInUp 0.35s ease' }}>
       <TopBar
         title="Genel Bakış"
         subtitle="Hoş geldiniz. Bugün 4 işlem bekliyor."
@@ -41,7 +41,9 @@ const DashboardPage = ({ onNavigate }) => {
           ))}
         </div>
 
-        <h3 style={{ fontFamily: fonts.heading, fontSize: '18px', fontWeight: 600, marginBottom: '16px' }}>Son Sözleşmeler</h3>
+        <h3 style={{ fontFamily: fonts.heading, fontSize: '18px', fontWeight: 600, marginBottom: '16px' }}>
+          Son Sözleşmeler
+        </h3>
         <Card style={{ padding: 0 }}>
           {recentContracts.map((contract, i) => (
             <div
