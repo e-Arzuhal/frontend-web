@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { TopBar } from '../components/layout';
 import { Card, Button, Badge, TextArea, StepIndicator } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
+import contractService from '../services/contract.service';
 
 const STEPS = ['Metin Girişi', 'Analiz', 'PDF', 'Onay'];
 
@@ -32,7 +33,10 @@ const CreateContractPage = () => {
   const [userInput, setUserInput] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
+  // NLP analiz henüz hazır olmadığı için mock analiz kullanılıyor
   const mockAnalysis = {
     contractType: 'Borç Sözleşmesi',
     confidence: 0.92,
@@ -47,10 +51,32 @@ const CreateContractPage = () => {
   const handleAnalyze = async () => {
     if (!userInput.trim()) return;
     setIsAnalyzing(true);
+    // NLP server hazır olduğunda: const result = await contractService.analyzeText(userInput);
     await new Promise(r => setTimeout(r, 1500));
     setAnalysisResult(mockAnalysis);
     setCurrentStep(1);
     setIsAnalyzing(false);
+  };
+
+  const handleSaveContract = async () => {
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      const entities = analysisResult?.entities || {};
+      await contractService.create({
+        title: analysisResult?.contractType || 'Yeni Sözleşme',
+        type: analysisResult?.contractType || 'Genel',
+        content: userInput,
+        amount: entities.tutar || '',
+        counterpartyName: entities.borçlu || entities.alacaklı || '',
+        counterpartyRole: entities.borçlu ? 'Borçlu' : 'Taraf',
+      });
+      setCurrentStep(3);
+    } catch (err) {
+      setSaveError(err.message || 'Sözleşme kaydedilemedi.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const renderStep0 = () => (
@@ -128,10 +154,20 @@ const CreateContractPage = () => {
         <InfoIcon />
       </div>
       <h3 style={{ fontFamily: fonts.heading, fontSize: '20px', marginBottom: '8px' }}>PDF Önizleme</h3>
-      <p style={{ color: colors.textSecondary, marginBottom: '24px' }}>Bu adım 6. haftada eklenecektir.</p>
+      <p style={{ color: colors.textSecondary, marginBottom: '24px' }}>Bu adım ilerleyen haftalarda eklenecektir.</p>
+      {saveError && (
+        <div style={{
+          padding: '12px', background: colors.errorBg, color: colors.error,
+          borderRadius: radius.md, fontSize: '13px', marginBottom: '16px',
+        }}>
+          {saveError}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
         <Button variant="outline" onClick={() => setCurrentStep(1)}>Geri</Button>
-        <Button variant="accent" onClick={() => setCurrentStep(3)}>Onaya Gönder</Button>
+        <Button variant="accent" onClick={handleSaveContract} loading={isSaving}>
+          {isSaving ? 'Kaydediliyor...' : 'Kaydet ve Onaya Gönder'}
+        </Button>
       </div>
     </Card>
   );
@@ -142,8 +178,8 @@ const CreateContractPage = () => {
         <CheckIcon size={44} />
       </div>
       <h3 style={{ fontFamily: fonts.heading, fontSize: '20px', marginBottom: '8px' }}>Sözleşme Oluşturuldu</h3>
-      <p style={{ color: colors.textSecondary, marginBottom: '24px' }}>Onay süreci 7. haftada eklenecektir.</p>
-      <Button variant="accent" onClick={() => { setCurrentStep(0); setUserInput(''); setAnalysisResult(null); }}>
+      <p style={{ color: colors.textSecondary, marginBottom: '24px' }}>Sözleşmeniz başarıyla kaydedildi.</p>
+      <Button variant="accent" onClick={() => { setCurrentStep(0); setUserInput(''); setAnalysisResult(null); setSaveError(''); }}>
         Yeni Sözleşme
       </Button>
     </Card>

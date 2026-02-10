@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MainLayout } from './components/layout';
-import { 
-  DashboardPage, 
-  CreateContractPage, 
-  ContractsPage, 
+import {
+  DashboardPage,
+  CreateContractPage,
+  ContractsPage,
   ApprovalsPage,
   SettingsPage,
   LoginPage,
   RegisterPage,
   ContractDetailPage,
 } from './pages';
+import authService from './services/auth.service';
 import './styles/global.css';
 
 function App() {
@@ -17,6 +18,24 @@ function App() {
   const [currentPage, setCurrentPage] = useState('login');
   const [user, setUser] = useState(null);
   const [selectedContractId, setSelectedContractId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check for existing authentication on component mount
+  useEffect(() => {
+    const checkAuth = () => {
+      const isAuth = authService.isAuthenticated();
+      const currentUser = authService.getCurrentUser();
+
+      if (isAuth && currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+        setCurrentPage('dashboard');
+      }
+      setIsLoading(false);
+    };
+
+    checkAuth();
+  }, []);
 
   const handleLogin = (userData) => {
     setUser(userData);
@@ -31,6 +50,7 @@ function App() {
   };
 
   const handleLogout = () => {
+    authService.logout();
     setUser(null);
     setIsAuthenticated(false);
     setCurrentPage('login');
@@ -43,6 +63,32 @@ function App() {
     setCurrentPage(page);
   };
 
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #0F1A30 0%, #1a2942 100%)',
+      }}>
+        <div style={{ textAlign: 'center', color: '#fff' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid rgba(255,255,255,0.1)',
+            borderTopColor: '#E8C882',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 16px',
+          }} />
+          <p>Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Auth sayfalari (login/register)
   if (!isAuthenticated) {
     if (currentPage === 'register') {
@@ -54,19 +100,19 @@ function App() {
   // Ana uygulama sayfalari
   const renderPage = () => {
     switch (currentPage) {
-      case 'dashboard': 
+      case 'dashboard':
         return <DashboardPage onNavigate={handleNavigate} />;
-      case 'create': 
+      case 'create':
         return <CreateContractPage />;
-      case 'contracts': 
+      case 'contracts':
         return <ContractsPage onNavigate={handleNavigate} />;
-      case 'approvals': 
+      case 'approvals':
         return <ApprovalsPage />;
-      case 'settings': 
+      case 'settings':
         return <SettingsPage onLogout={handleLogout} />;
       case 'contract-detail':
         return <ContractDetailPage contractId={selectedContractId} onBack={() => setCurrentPage('contracts')} />;
-      default: 
+      default:
         return <DashboardPage onNavigate={handleNavigate} />;
     }
   };

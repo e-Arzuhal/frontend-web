@@ -11,6 +11,9 @@ const contractService = {
   getSuggestions: (data) => api.post('/api/contracts/suggestions', data),
   finalize: (id) => api.post(`/api/contracts/${id}/finalize`),
   getPendingApprovals: () => api.get('/api/contracts/pending-approval'),
+  getStats: () => api.get('/api/contracts/stats'),
+  approve: (id) => api.post(`/api/contracts/${id}/approve`),
+  reject: (id) => api.post(`/api/contracts/${id}/reject`),
 };
 
 export default contractService;
