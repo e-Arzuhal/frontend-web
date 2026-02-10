@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Card, Button, Input } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
+import authService from '../services/auth.service';
 
 const EmailIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
@@ -38,12 +39,11 @@ const LoginPage = ({ onLogin, onNavigate }) => {
 
     setIsLoading(true);
 
-    // Simulated login - backend entegrasyonunda değişecek
     try {
-      await new Promise(r => setTimeout(r, 1000));
-      onLogin({ email, name: 'Kullanıcı' });
+      const response = await authService.login(email, password);
+      onLogin(response.userInfo);
     } catch (err) {
-      setError('Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
+      setError(err.message || 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
     } finally {
       setIsLoading(false);
     }

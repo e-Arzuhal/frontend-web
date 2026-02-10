@@ -1,12 +1,9 @@
-/**
- * e-Arzuhal Settings Page
- * Kullanıcı ayarları
- */
-
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { TopBar } from '../components/layout';
 import { Card, Button, Input, Badge } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
+import authService from '../services/auth.service';
+import api from '../services/api.service';
 
 const TabIcon = ({ name, size = 20 }) => {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', xmlns: 'http://www.w3.org/2000/svg', style: { display: 'block' } };
@@ -24,17 +21,58 @@ const TabIcon = ({ name, size = 20 }) => {
   }
 };
 
+const SettingRow = ({ label, description, checked, onToggle, isLast }) => (
+  <div style={{
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '16px 0', borderBottom: isLast ? 'none' : `1px solid ${colors.border}`,
+  }}>
+    <div>
+      <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '2px' }}>{label}</div>
+      <div style={{ fontSize: '12px', color: colors.textSecondary }}>{description}</div>
+    </div>
+    <div
+      onClick={onToggle}
+      style={{
+        width: '44px', height: '24px', borderRadius: '12px', cursor: 'pointer',
+        background: checked ? colors.success : colors.border,
+        position: 'relative', transition: 'background 0.2s',
+      }}
+    >
+      <div style={{
+        width: '18px', height: '18px', borderRadius: '50%', background: '#fff',
+        position: 'absolute', top: '3px', left: checked ? '23px' : '3px',
+        transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+      }} />
+    </div>
+  </div>
+);
+
 const SettingsPage = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('profile');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  const currentUser = authService.getCurrentUser();
 
   const [profile, setProfile] = useState({
-    name: 'Deniz Eren Arıcı',
-    email: 'deniz@example.com',
-    phone: '0532 XXX XX XX',
+    name: '',
+    email: '',
+    phone: '',
     company: '',
   });
 
-  // (Hook kuralı düzeltmesi) Bildirim state’i sayfa seviyesinde
+  useEffect(() => {
+    if (currentUser) {
+      const fullName = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ');
+      setProfile({
+        name: fullName || currentUser.username || '',
+        email: currentUser.email || '',
+        phone: '',
+        company: '',
+      });
+    }
+  }, []);
+
   const [notifications, setNotifications] = useState({
     email: true,
     sms: false,
@@ -52,6 +90,30 @@ const SettingsPage = ({ onLogout }) => {
     { id: 'notifications', label: 'Bildirimler', icon: 'notifications' },
   ]), []);
 
+  const handleSaveProfile = async () => {
+    setSaveSuccess(false);
+    setSaveError('');
+    try {
+      const nameParts = profile.name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      await api.put('/api/users/me', {
+        firstName,
+        lastName,
+        email: profile.email,
+      });
+
+      // Update localStorage
+      const updatedUser = { ...currentUser, firstName, lastName, email: profile.email };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setSaveError(err.message || 'Profil güncellenemedi.');
+    }
+  };
+
   const renderProfileTab = () => (
     <div>
       <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '20px' }}>Profil Bilgileri</h3>
@@ -63,9 +125,20 @@ const SettingsPage = ({ onLogout }) => {
         <Input label="Şirket (Opsiyonel)" value={profile.company} onChange={(e) => setProfile((p) => ({ ...p, company: e.target.value }))} />
       </div>
 
+      {saveSuccess && (
+        <div style={{ padding: '12px', background: colors.successBg, color: colors.success, borderRadius: radius.md, fontSize: '13px', marginBottom: '14px' }}>
+          Profil başarıyla güncellendi.
+        </div>
+      )}
+      {saveError && (
+        <div style={{ padding: '12px', background: colors.errorBg, color: colors.error, borderRadius: radius.md, fontSize: '13px', marginBottom: '14px' }}>
+          {saveError}
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
         <Button variant="outline">İptal</Button>
-        <Button variant="accent">Kaydet</Button>
+        <Button variant="accent" onClick={handleSaveProfile}>Kaydet</Button>
       </div>
     </div>
   );
@@ -98,7 +171,7 @@ const SettingsPage = ({ onLogout }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px' }}>Aktif Oturumlar</div>
-            <div style={{ fontSize: '13px', color: colors.textSecondary }}>2 cihazda aktif oturum bulunuyor</div>
+            <div style={{ fontSize: '13px', color: colors.textSecondary }}>1 cihazda aktif oturum bulunuyor</div>
           </div>
           <Button variant="ghost" size="sm" style={{ color: colors.error }}>Tümünü Kapat</Button>
         </div>

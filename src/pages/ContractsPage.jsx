@@ -1,33 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TopBar } from '../components/layout';
 import { Card, Button, Badge, Input } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
+import contractService from '../services/contract.service';
 
-const ContractsPage = () => {
+const ContractsPage = ({ onNavigate }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [contracts, setContracts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const contracts = [
-    { id: 1, name: 'Borç Sözleşmesi', party: 'Ahmet Yılmaz', type: 'Borç', amount: '50.000 TL', status: 'pending', date: '07.02.2026' },
-    { id: 2, name: 'Kira Sözleşmesi', party: 'Zeynep Ay', type: 'Kira', amount: '15.000 TL/ay', status: 'approved', date: '05.02.2026' },
-    { id: 3, name: 'Hizmet Sözleşmesi', party: 'ABC Ltd.', type: 'Hizmet', amount: '25.000 TL', status: 'draft', date: '04.02.2026' },
-  ];
+  useEffect(() => {
+    const fetchContracts = async () => {
+      try {
+        const data = await contractService.getAll();
+        setContracts(data);
+      } catch (error) {
+        console.error('Contracts fetch error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContracts();
+  }, []);
 
   const statusConfig = {
-    pending: { label: 'Onay Bekliyor', variant: 'warning' },
-    approved: { label: 'Onaylandı', variant: 'success' },
-    draft: { label: 'Taslak', variant: 'default' },
+    PENDING: { label: 'Onay Bekliyor', variant: 'warning' },
+    APPROVED: { label: 'Onaylandı', variant: 'success' },
+    DRAFT: { label: 'Taslak', variant: 'default' },
+    COMPLETED: { label: 'Tamamlandı', variant: 'success' },
+    REJECTED: { label: 'Reddedildi', variant: 'error' },
   };
 
   const filters = [
     { id: 'all', label: 'Tümü' },
-    { id: 'pending', label: 'Bekleyen' },
-    { id: 'approved', label: 'Onaylanan' },
-    { id: 'draft', label: 'Taslak' },
+    { id: 'PENDING', label: 'Bekleyen' },
+    { id: 'APPROVED', label: 'Onaylanan' },
+    { id: 'DRAFT', label: 'Taslak' },
   ];
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
   const filtered = contracts.filter(c => {
-    const matchSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.party.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchSearch = (c.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.counterpartyName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchFilter = filterStatus === 'all' || c.status === filterStatus;
     return matchSearch && matchFilter;
   });
@@ -37,7 +58,7 @@ const ContractsPage = () => {
       <TopBar
         title="Sözleşmelerim"
         subtitle={`Toplam ${contracts.length} sözleşme`}
-        actions={<Button variant="accent">Yeni Sözleşme</Button>}
+        actions={<Button variant="accent" onClick={() => onNavigate && onNavigate('create')}>Yeni Sözleşme</Button>}
       />
 
       <div style={{ padding: '28px 32px' }}>
@@ -72,23 +93,32 @@ const ContractsPage = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 80px', padding: '12px 20px', background: colors.surfaceAlt, fontSize: '12px', fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase' }}>
             <span>Sözleşme</span><span>Taraf</span><span>Tür</span><span>Tutar</span><span>Durum</span><span></span>
           </div>
-          {filtered.map((c, i) => (
-            <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 80px', padding: '16px 20px', alignItems: 'center', borderBottom: i < filtered.length - 1 ? `1px solid ${colors.border}` : 'none' }}>
-              <div>
-                <div style={{ fontWeight: 500 }}>{c.name}</div>
-                <div style={{ fontSize: '12px', color: colors.textMuted }}>{c.date}</div>
-              </div>
-              <span style={{ color: colors.textSecondary }}>{c.party}</span>
-              <Badge>{c.type}</Badge>
-              <span style={{ fontWeight: 500 }}>{c.amount}</span>
-              <Badge variant={statusConfig[c.status].variant}>{statusConfig[c.status].label}</Badge>
-              <Button variant="ghost" size="sm">Görüntüle</Button>
+          {loading ? (
+            <div style={{ padding: '48px', textAlign: 'center', color: colors.textMuted }}>
+              Yükleniyor...
             </div>
-          ))}
-          {filtered.length === 0 && (
+          ) : filtered.length === 0 ? (
             <div style={{ padding: '48px', textAlign: 'center', color: colors.textMuted }}>
               Sonuç bulunamadı.
             </div>
+          ) : (
+            filtered.map((c, i) => (
+              <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 80px', padding: '16px 20px', alignItems: 'center', borderBottom: i < filtered.length - 1 ? `1px solid ${colors.border}` : 'none' }}>
+                <div>
+                  <div style={{ fontWeight: 500 }}>{c.title}</div>
+                  <div style={{ fontSize: '12px', color: colors.textMuted }}>{formatDate(c.createdAt)}</div>
+                </div>
+                <span style={{ color: colors.textSecondary }}>{c.counterpartyName || '-'}</span>
+                <Badge>{c.type || '-'}</Badge>
+                <span style={{ fontWeight: 500 }}>{c.amount || '-'}</span>
+                <Badge variant={statusConfig[c.status]?.variant || 'default'}>
+                  {statusConfig[c.status]?.label || c.status}
+                </Badge>
+                <Button variant="ghost" size="sm" onClick={() => onNavigate && onNavigate('contract-detail', { contractId: c.id })}>
+                  Görüntüle
+                </Button>
+              </div>
+            ))
           )}
         </Card>
       </div>

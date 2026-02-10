@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Card, Button, Input } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
+import authService from '../services/auth.service';
 
 const UserIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
@@ -65,13 +66,15 @@ const RegisterPage = ({ onRegister, onNavigate }) => {
     const newErrors = {};
 
     if (!formData.name.trim()) newErrors.name = 'Ad soyad zorunludur.';
+    else if (formData.name.trim().length < 3) newErrors.name = 'Ad soyad en az 3 karakter olmalıdır.';
+
     if (!formData.email.trim()) newErrors.email = 'E-posta zorunludur.';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Geçerli bir e-posta girin.';
 
     if (!formData.phone.trim()) newErrors.phone = 'Telefon zorunludur.';
 
     if (!formData.password) newErrors.password = 'Şifre zorunludur.';
-    else if (formData.password.length < 6) newErrors.password = 'Şifre en az 6 karakter olmalıdır.';
+    else if (formData.password.length < 8) newErrors.password = 'Şifre en az 8 karakter olmalıdır.';
 
     if (formData.password !== formData.passwordConfirm) newErrors.passwordConfirm = 'Şifreler eşleşmiyor.';
 
@@ -83,17 +86,28 @@ const RegisterPage = ({ onRegister, onNavigate }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validate()) return;
 
     setIsLoading(true);
-    
+
     try {
-      await new Promise(r => setTimeout(r, 1000));
-      // Mock basarili kayit
-      onRegister({ email: formData.email, name: formData.name });
+      // Split name into first and last name
+      const nameParts = formData.name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      const response = await authService.register({
+        username: formData.email.split('@')[0], // Use email prefix as username
+        email: formData.email,
+        password: formData.password,
+        firstName: firstName,
+        lastName: lastName,
+      });
+
+      onRegister(response.userInfo);
     } catch (err) {
-      setErrors({ general: 'Kayıt başarısız. Lütfen tekrar deneyin.' });
+      setErrors({ general: err.message || 'Kayıt başarısız. Lütfen tekrar deneyin.' });
     } finally {
       setIsLoading(false);
     }
