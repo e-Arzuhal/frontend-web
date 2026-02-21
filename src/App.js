@@ -9,6 +9,7 @@ import {
   LoginPage,
   RegisterPage,
   ContractDetailPage,
+  VerificationPage,
 } from './pages';
 import authService from './services/auth.service';
 import './styles/global.css';
@@ -103,7 +104,7 @@ function App() {
       case 'dashboard':
         return <DashboardPage onNavigate={handleNavigate} />;
       case 'create':
-        return <CreateContractPage />;
+        return <CreateContractPage onNavigate={handleNavigate} />;
       case 'contracts':
         return <ContractsPage onNavigate={handleNavigate} />;
       case 'approvals':
@@ -112,6 +113,8 @@ function App() {
         return <SettingsPage onLogout={handleLogout} />;
       case 'contract-detail':
         return <ContractDetailPage contractId={selectedContractId} onBack={() => setCurrentPage('contracts')} />;
+      case 'verification':
+        return <VerificationPage />;
       default:
         return <DashboardPage onNavigate={handleNavigate} />;
     }

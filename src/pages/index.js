@@ -6,3 +6,4 @@ export { default as SettingsPage } from './SettingsPage';
 export { default as LoginPage } from './LoginPage';
 export { default as RegisterPage } from './RegisterPage';
 export { default as ContractDetailPage } from './ContractDetailPage';
+export { default as VerificationPage } from './VerificationPage';
