@@ -132,6 +132,13 @@ const NavIcon = ({ name, size = 20 }) => {
           <path {...stroke} d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" />
         </svg>
       );
+    case 'verification':
+      return (
+        <svg {...common} aria-hidden>
+          <path {...stroke} d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <path {...stroke} d="M9 12l2 2 4-4" />
+        </svg>
+      );
     case 'settings':
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
@@ -161,6 +168,7 @@ const Sidebar = ({ currentPage, onPageChange }) => {
     { id: 'create', label: 'Yeni Sözleşme', icon: 'create' },
     { id: 'contracts', label: 'Sözleşmelerim', icon: 'contracts' },
     { id: 'approvals', label: 'Onay Bekleyenler', icon: 'approvals' },
+    { id: 'verification', label: 'Kimlik Doğrulama', icon: 'verification' },
   ];
 
   const bottomItems = [{ id: 'settings', label: 'Ayarlar', icon: 'settings' }];
