@@ -14,6 +14,7 @@ const contractService = {
   getStats: () => api.get('/api/contracts/stats'),
   approve: (id) => api.post(`/api/contracts/${id}/approve`),
   reject: (id) => api.post(`/api/contracts/${id}/reject`),
+  downloadPdf: (id) => api.getBlob(`/api/contracts/${id}/pdf`),
 };
 
 export default contractService;
