@@ -44,6 +44,25 @@ class ApiService {
   delete(endpoint) {
     return this.request(endpoint, { method: 'DELETE' });
   }
+
+  async getBlob(endpoint) {
+    const url = `${this.baseUrl}${endpoint}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    const headers = {};
+    const token = localStorage.getItem('authToken');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    try {
+      const response = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.blob();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') throw new Error('İstek zaman aşımına uğradı.');
+      throw error;
+    }
+  }
 }
 
 const api = new ApiService();

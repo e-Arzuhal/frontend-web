@@ -45,3 +45,5 @@ coverage/
 dist-ssr/
 *.pem
 .eslintcache
+
+node_modules/

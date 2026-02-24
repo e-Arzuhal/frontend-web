@@ -4,10 +4,19 @@ import { Card, Button, Badge, ProgressBar } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
 import contractService from '../services/contract.service';
 
+const DownloadIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <polyline points="7 10 12 15 17 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
 const ContractDetailPage = ({ contractId, onBack }) => {
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isPdfDownloading, setIsPdfDownloading] = useState(false);
 
   useEffect(() => {
     const fetchContract = async () => {
@@ -35,6 +44,23 @@ const ContractDetailPage = ({ contractId, onBack }) => {
     DRAFT: { label: 'Taslak', variant: 'default', color: colors.textMuted },
     COMPLETED: { label: 'Tamamlandı', variant: 'success', color: colors.success },
     REJECTED: { label: 'Reddedildi', variant: 'error', color: colors.error },
+  };
+
+  const handleDownloadPdf = async () => {
+    setIsPdfDownloading(true);
+    try {
+      const blob = await contractService.downloadPdf(contract.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sozlesme-${String(contract.id).padStart(6, '0')}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PDF download error:', err);
+    } finally {
+      setIsPdfDownloading(false);
+    }
   };
 
   const formatDate = (dateStr) => {
@@ -216,6 +242,11 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                     Onaya Gönder
                   </Button>
                 )}
+                <Button variant="outline" fullWidth onClick={handleDownloadPdf} loading={isPdfDownloading}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <DownloadIcon /> {isPdfDownloading ? 'İndiriliyor...' : 'PDF İndir'}
+                  </span>
+                </Button>
                 <Button variant="outline" fullWidth onClick={onBack}>Sözleşmelere Dön</Button>
                 <Button variant="ghost" fullWidth style={{ color: colors.error }} onClick={async () => {
                   try {

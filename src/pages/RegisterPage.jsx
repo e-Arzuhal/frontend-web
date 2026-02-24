@@ -216,7 +216,7 @@ const RegisterPage = ({ onRegister, onNavigate }) => {
                 type="password"
                 name="password"
                 autoComplete="new-password"
-                placeholder="En az 6 karakter"
+                placeholder="En az 8 karakter"
                 value={formData.password}
                 onChange={handleChange('password')}
                 error={errors.password}
