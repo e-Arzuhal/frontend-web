@@ -12,6 +12,7 @@ import {
   VerificationPage,
 } from './pages';
 import authService from './services/auth.service';
+import ChatbotWidget from './components/ChatbotWidget';
 import './styles/global.css';
 
 function App() {
@@ -123,6 +124,7 @@ function App() {
   return (
     <MainLayout currentPage={currentPage} onPageChange={setCurrentPage}>
       {renderPage()}
+      {isAuthenticated && <ChatbotWidget />}
     </MainLayout>
   );
 }
