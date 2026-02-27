@@ -13,6 +13,7 @@ import {
 } from './pages';
 import authService from './services/auth.service';
 import ChatbotWidget from './components/ChatbotWidget';
+import DisclaimerBanner from './components/DisclaimerBanner';
 import './styles/global.css';
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [selectedContractId, setSelectedContractId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
 
   // Check for existing authentication on component mount
   useEffect(() => {
@@ -123,6 +125,7 @@ function App() {
 
   return (
     <MainLayout currentPage={currentPage} onPageChange={setCurrentPage}>
+      <DisclaimerBanner onAccepted={() => setDisclaimerAccepted(true)} />
       {renderPage()}
       {isAuthenticated && <ChatbotWidget />}
     </MainLayout>
