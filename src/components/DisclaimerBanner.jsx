@@ -8,7 +8,7 @@ const DisclaimerBanner = ({ onAccepted }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Hızlı kontrol: localStorage cache'i
+    // Oturumda zaten kabul edildiyse backend'e sorma
     if (localStorage.getItem(STORAGE_KEY)) {
       onAccepted && onAccepted();
       return;
@@ -24,7 +24,7 @@ const DisclaimerBanner = ({ onAccepted }) => {
         }
       })
       .catch(() => setVisible(true)); // backend erişilemiyor → göster
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAccept = async () => {
     setLoading(true);
