@@ -19,6 +19,11 @@ class ApiService {
       const response = await fetch(url, { ...options, headers, signal: controller.signal });
       clearTimeout(timeoutId);
       const data = await response.json();
+      if (response.status === 401) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        localStorage.removeItem('disclaimerAccepted_v1.0');
+      }
       if (!response.ok) throw new Error(data.message || `HTTP ${response.status}`);
       return data;
     } catch (error) {

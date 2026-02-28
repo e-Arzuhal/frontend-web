@@ -512,6 +512,16 @@ const CreateContractPage = ({ onNavigate }) => {
         <div style={{ marginBottom: '32px' }}>
           <StepIndicator steps={STEPS} currentStep={currentStep} />
         </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '10px 16px', marginBottom: '20px',
+          background: 'rgba(232, 200, 130, 0.1)',
+          border: '1px solid rgba(232, 200, 130, 0.4)',
+          borderRadius: '8px', fontSize: '13px', color: '#7a6535',
+        }}>
+          <span>⚠️</span>
+          Bu platform hukuki tavsiye vermez. Oluşturulan sözleşmeyi imzalamadan önce bir avukata danışmanızı öneririz.
+        </div>
         {steps[currentStep]()}
       </div>
     </div>

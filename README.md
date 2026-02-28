@@ -214,6 +214,32 @@ verificationService.verify(data)                   // POST /api/verification/ide
 ### Week 9 — Chatbot
 - [ ] Chatbot UI
 
+### Week 10 — Yasal Uyari & Guvenlik (Mevcut)
+- [x] `DisclaimerBanner.jsx` — Yasal uyari modal bileseni
+- [x] `App.js` — `disclaimerAccepted` state + DisclaimerBanner entegrasyonu
+- [x] Disclaimer kabul durumu localStorage + backend cache
+- [x] Sozlesme sonuclandirma (finalize) oncesi disclaimer kontrolu
+
+---
+
+## Disclaimer (Yasal Uyari) Bileseni
+
+`src/components/DisclaimerBanner.jsx`
+
+Uygulama acilisinda tam ekran overlay modal olarak gosterilir.
+
+**Akis:**
+1. `localStorage.getItem('disclaimerAccepted_v1.0')` kontrolu
+2. Yoksa `GET /api/disclaimer/status` backend kontrolu
+3. Kabul edilmemisse modal gosterilir, arkaplan etkisizlestirilir
+4. "Anladim ve Kabul Ediyorum" tiklaninca `POST /api/disclaimer/accept` cagirilir, `platform: 'WEB'` gonderilir
+5. localStorage'e kaydedilir, modal kapanir
+
+**Uyari metni:**
+> "Bu platformda verilen hukuki tavsiyeler yanıltıcı olabilir ve bir avukata danışmanız şiddetle tavsiye edilir."
+
+Sozlesme `finalize` isleminde backend bu kaydı zorunlu tutar — kabul edilmeden PDF/sozlesme sonuclandirilamaz.
+
 ---
 
 ## Takım

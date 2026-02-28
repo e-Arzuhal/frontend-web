@@ -231,16 +231,27 @@ const ContractDetailPage = ({ contractId, onBack }) => {
               <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>İşlemler</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {contract.status === 'DRAFT' && (
-                  <Button variant="accent" fullWidth onClick={async () => {
-                    try {
-                      const updated = await contractService.finalize(contract.id);
-                      setContract(updated);
-                    } catch (err) {
-                      console.error('Finalize error:', err);
-                    }
-                  }}>
-                    Onaya Gönder
-                  </Button>
+                  <>
+                    <div style={{
+                      padding: '10px 12px', marginBottom: '4px',
+                      background: 'rgba(232, 200, 130, 0.1)',
+                      border: '1px solid rgba(232, 200, 130, 0.4)',
+                      borderRadius: '8px', fontSize: '12px', color: '#7a6535',
+                      lineHeight: 1.5,
+                    }}>
+                      ⚠️ Onaya göndermeden önce sözleşmeyi bir avukata inceletmenizi öneririz.
+                    </div>
+                    <Button variant="accent" fullWidth onClick={async () => {
+                      try {
+                        const updated = await contractService.finalize(contract.id);
+                        setContract(updated);
+                      } catch (err) {
+                        console.error('Finalize error:', err);
+                      }
+                    }}>
+                      Onaya Gönder
+                    </Button>
+                  </>
                 )}
                 <Button variant="outline" fullWidth onClick={handleDownloadPdf} loading={isPdfDownloading}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>

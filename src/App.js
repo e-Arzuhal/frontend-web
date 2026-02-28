@@ -12,7 +12,9 @@ import {
   VerificationPage,
 } from './pages';
 import authService from './services/auth.service';
+import api from './services/api.service';
 import ChatbotWidget from './components/ChatbotWidget';
+import DisclaimerBanner from './components/DisclaimerBanner';
 import './styles/global.css';
 
 function App() {
@@ -21,19 +23,29 @@ function App() {
   const [user, setUser] = useState(null);
   const [selectedContractId, setSelectedContractId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
 
   // Check for existing authentication on component mount
   useEffect(() => {
-    const checkAuth = () => {
-      const isAuth = authService.isAuthenticated();
-      const currentUser = authService.getCurrentUser();
-
-      if (isAuth && currentUser) {
+    const checkAuth = async () => {
+      const token = authService.getToken();
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+      try {
+        // Token'ın backend'de hâlâ geçerli olduğunu doğrula
+        await api.get('/api/users/me');
+        const currentUser = authService.getCurrentUser();
         setUser(currentUser);
         setIsAuthenticated(true);
         setCurrentPage('dashboard');
+      } catch {
+        // Süresi dolmuş veya geçersiz token → temizle, login'e yönlendir
+        authService.logout();
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     checkAuth();
@@ -123,6 +135,7 @@ function App() {
 
   return (
     <MainLayout currentPage={currentPage} onPageChange={setCurrentPage}>
+      <DisclaimerBanner onAccepted={() => setDisclaimerAccepted(true)} />
       {renderPage()}
       {isAuthenticated && <ChatbotWidget />}
     </MainLayout>
