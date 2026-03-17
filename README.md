@@ -4,50 +4,44 @@ e-Arzuhal Akıllı Sözleşme Sistemi — React Web Uygulaması
 
 ---
 
+## Tech Stack
+
+| Katman | Teknoloji |
+|--------|-----------|
+| Framework | React 18 |
+| Stil | Inline styles + design tokens |
+| API | JWT-aware fetch wrapper |
+| Font | Playfair Display + DM Sans (Google Fonts) |
+
+---
+
 ## Proje Yapısı
 
 ```
 src/
 ├── components/
-│   ├── ui/                       # Yeniden kullanılabilir UI bileşenleri
-│   │   ├── Button.jsx
-│   │   ├── Card.jsx
-│   │   ├── Badge.jsx
-│   │   ├── Input.jsx
-│   │   ├── TextArea.jsx
-│   │   ├── ProgressBar.jsx
-│   │   ├── StepIndicator.jsx
-│   │   └── index.js
-│   └── layout/                   # Layout bileşenleri
-│       ├── Sidebar.jsx           # Sol navigasyon (5 ana sayfa + Kimlik Doğrulama)
-│       ├── TopBar.jsx
-│       ├── MainLayout.jsx
-│       └── index.js
-├── pages/                        # Sayfa bileşenleri
-│   ├── DashboardPage.jsx         # Ana sayfa + istatistikler
-│   ├── CreateContractPage.jsx    # 4 adımlı sözleşme oluşturma + PDF önizleme
-│   ├── ContractsPage.jsx         # Sözleşme listesi
-│   ├── ContractDetailPage.jsx    # Sözleşme detayı + PDF indir
-│   ├── ApprovalsPage.jsx         # Onay bekleyenler
-│   ├── SettingsPage.jsx          # Profil & güvenlik ayarları
-│   ├── VerificationPage.jsx      # TC Kimlik doğrulama (NFC / kamera / manuel)
+│   ├── ui/                       # Button, Card, Badge, Input, TextArea, ProgressBar, StepIndicator
+│   ├── layout/                   # Sidebar, TopBar, MainLayout
+│   └── DisclaimerBanner.jsx      # Yasal uyarı overlay (useRef hook pattern)
+├── pages/
+│   ├── DashboardPage.jsx
+│   ├── CreateContractPage.jsx    # Gerçek NLP API entegrasyonu
+│   ├── ContractsPage.jsx
+│   ├── ContractDetailPage.jsx
+│   ├── ApprovalsPage.jsx
+│   ├── SettingsPage.jsx
+│   ├── VerificationPage.jsx      # NFC için açıklayıcı modal
 │   ├── LoginPage.jsx
-│   ├── RegisterPage.jsx
-│   └── index.js
-├── services/                     # API servis katmanı
-│   ├── api.service.js            # JWT-aware base HTTP wrapper (JSON + blob)
-│   ├── auth.service.js           # Kimlik doğrulama işlemleri
-│   ├── contract.service.js       # Sözleşme CRUD + PDF download
-│   └── verification.service.js   # Kimlik doğrulama API çağrıları
-├── hooks/                        # Custom React hooks
-├── utils/                        # Yardımcı fonksiyonlar
+│   └── RegisterPage.jsx
+├── services/
+│   ├── api.service.js            # JWT-aware HTTP wrapper
+│   ├── auth.service.js
+│   ├── contract.service.js       # analyzeText → /api/analysis/analyze
+│   └── verification.service.js
 ├── styles/
-│   ├── tokens.js                 # Design tokens (renkler, fontlar, spacing)
-│   └── global.css                # Global stiller
-├── config/
-│   └── api.config.js             # API URL yapılandırması
-├── App.js                        # Routing (state tabanlı, React Router yok)
-└── index.js
+│   ├── tokens.js
+│   └── global.css
+└── App.js                        # State tabanlı routing (React Router yok)
 ```
 
 ---
@@ -62,12 +56,7 @@ npm start
 
 Uygulama `http://localhost:3000` adresinde çalışır.
 
----
-
-## API Yapılandırması
-
-Backend URL'i `src/config/api.config.js` dosyasından veya environment variable ile ayarlanabilir:
-
+**API URL değiştirmek için:**
 ```bash
 REACT_APP_API_URL=http://localhost:8080 npm start
 ```
@@ -80,41 +69,20 @@ REACT_APP_API_URL=http://localhost:8080 npm start
 
 ```
 Adım 0: Metin Girişi    → Kullanıcı doğal dilde yazar
-Adım 1: Analiz          → NLP sözleşme türü + entity tespiti (şu an mock)
+Adım 1: Analiz          → POST /api/analysis/analyze (gerçek NLP + GraphRAG)
 Adım 2: PDF Önizleme    → Blob URL ile iframe içinde PDF gösterilir
 Adım 3: Onay            → Sözleşme oluşturuldu; detay sayfasına git
 ```
 
-**PDF Önizleme Tekniği:**
-```js
-// JWT-authenticated PDF fetch
-const blob = await contractService.downloadPdf(id);
-const url = URL.createObjectURL(blob);
-// iframe src olarak kullanılır, blob URL component unmount'ta revoke edilir
-```
-
-### ContractDetailPage — Sözleşme Detayı
-
-- Durum kartı (DRAFT / PENDING / APPROVED / REJECTED / COMPLETED)
-- Sözleşme içeriği ve detaylar
-- Taraflar (sahibi + karşı taraf)
-- İşlemler: Onaya Gönder | **PDF İndir** | Sözleşmelere Dön | Sil
+Analiz yanıtı `nlp_result.extracted_fields` ve `graphrag_result.suggestions` alanlarını
+component'in beklediği formata dönüştürerek gösterir.
 
 ### VerificationPage — TC Kimlik Doğrulama
 
-İki doğrulama modu:
+**Manuel Giriş:** TC No (11 hane) + Ad + Soyad + Doğum Tarihi → backend doğrulama
 
-**1. Manuel Giriş:**
-- TC No (11 hane), Ad, Soyad, Doğum Tarihi
-- Frontend'de TC checksum algoritması çalışır (formda anlık kontrol)
-- Backend'e `POST /api/verification/identity` gönderilir
-- TC No'nun ham değeri hiçbir zaman saklanmaz
-
-**2. Kamera ile Tara:**
-- `navigator.mediaDevices.getUserMedia()` ile kamera açılır
-- MRZ bölgesi çerçevesiyle hizalama rehberi gösterilir (arka kısım)
-- MRZ OCR backend entegrasyonu planlanmaktadır (Burak)
-- NFC için mobil uygulama yönlendirmesi gösterilir
+**NFC:** Web tarayıcıda NFC desteklenmez. NFC butonuna tıklandığında açıklayıcı modal gösterilir:
+> "NFC ile T.C. Kimlik Kartı doğrulaması yalnızca e-Arzuhal mobil uygulaması üzerinden yapılabilmektedir."
 
 **TC Checksum Algoritması (frontend):**
 ```js
@@ -131,119 +99,51 @@ const isValidTcNo = (tcNo) => {
 
 ## Servis Katmanı
 
-### api.service.js
-
-JWT token'ı otomatik header'a ekleyen base wrapper:
-
-```js
-// JSON yanıt için
-api.get('/api/contracts')
-api.post('/api/contracts', data)
-
-// Binary (PDF) yanıt için
-api.getBlob('/api/contracts/1/pdf')  // → Promise<Blob>
-```
-
 ### contract.service.js
 
 ```js
+contractService.analyzeText(text)      // POST /api/analysis/analyze
 contractService.create(data)
 contractService.getAll()
 contractService.getById(id)
 contractService.update(id, data)
 contractService.delete(id)
-contractService.finalize(id)        // DRAFT → PENDING
+contractService.finalize(id)
 contractService.approve(id)
 contractService.reject(id)
-contractService.downloadPdf(id)     // → Blob
+contractService.downloadPdf(id)        // → Blob
 contractService.getStats()
 ```
 
-### verification.service.js
+---
 
-```js
-verificationService.getStatus()                    // GET /api/verification/status
-verificationService.verify(data)                   // POST /api/verification/identity
-```
+## Disclaimer (Yasal Uyarı) Bileşeni
+
+`src/components/DisclaimerBanner.jsx`
+
+Uygulama açılışında tam ekran overlay olarak gösterilir.
+
+**useRef Pattern:** `onAccepted` callback'i `useRef` ile tutulur; `useEffect` yalnızca
+mount'ta çalışır. Bu sayede stale closure ve `eslint-disable` yorumuna gerek kalmaz.
+
+**Akış:**
+1. `localStorage.getItem('disclaimerAccepted_v1.0')` kontrolü
+2. Yoksa `GET /api/disclaimer/status` backend kontrolü
+3. Kabul edilmemişse modal görünür
+4. "Okudum, Anladım" → `POST /api/disclaimer/accept` + localStorage kayıt
 
 ---
 
 ## Navigasyon
 
-`App.js` state tabanlı routing kullanır (React Router yok). Sayfa geçişleri `setCurrentPage()` ile yapılır.
+`App.js` state tabanlı routing kullanır (React Router yok). `setCurrentPage()` ile geçiş.
 
-**Sidebar navigasyon menüsü:**
-- Genel Bakış (`dashboard`)
-- Yeni Sözleşme (`create`)
-- Sözleşmelerim (`contracts`)
-- Onay Bekleyenler (`approvals`)
-- **Kimlik Doğrulama** (`verification`)
-- Ayarlar (`settings`) — alt kısımda
-
----
-
-## Haftalık İlerleme
-
-### Week 1–2 — Temel Altyapı
-- [x] Design system (tokens, renkler, fontlar)
-- [x] UI bileşenleri (Button, Card, Badge, Input, TextArea, ProgressBar, StepIndicator)
-- [x] Layout (Sidebar, TopBar, MainLayout)
-- [x] Sayfa iskeletleri
-- [x] API servis katmanı
-
-### Week 3–5 — Backend Entegrasyonu
-- [x] Auth flow (login, register, JWT)
-- [x] Sözleşme CRUD
-- [x] Dashboard istatistikleri
-
-### Week 6 — PDF
-- [x] PDF önizleme (blob URL + iframe) — CreateContractPage Step 2
-- [x] PDF indirme — ContractDetailPage
-
-### Week 7 — Taraflar & Onay
-- [x] Onay akışı UI (ApprovalsPage)
-- [x] ContractDetailPage finalize/approve/reject
-
-### Week 8 — NFC & Kimlik Doğrulama
-- [x] VerificationPage (Manuel + Kamera modu)
-- [x] TC Kimlik checksum doğrulama (frontend + backend)
-- [x] Doğrulama durum kartı
-- [x] Mobil NFC yönlendirmesi (bilgi paneli)
-- [ ] MRZ OCR entegrasyonu (Burak — plannlı)
-
-### Week 9 — Chatbot
-- [ ] Chatbot UI
-
-### Week 10 — Yasal Uyari & Guvenlik (Mevcut)
-- [x] `DisclaimerBanner.jsx` — Yasal uyari modal bileseni
-- [x] `App.js` — `disclaimerAccepted` state + DisclaimerBanner entegrasyonu
-- [x] Disclaimer kabul durumu localStorage + backend cache
-- [x] Sozlesme sonuclandirma (finalize) oncesi disclaimer kontrolu
-
----
-
-## Disclaimer (Yasal Uyari) Bileseni
-
-`src/components/DisclaimerBanner.jsx`
-
-Uygulama acilisinda tam ekran overlay modal olarak gosterilir.
-
-**Akis:**
-1. `localStorage.getItem('disclaimerAccepted_v1.0')` kontrolu
-2. Yoksa `GET /api/disclaimer/status` backend kontrolu
-3. Kabul edilmemisse modal gosterilir, arkaplan etkisizlestirilir
-4. "Anladim ve Kabul Ediyorum" tiklaninca `POST /api/disclaimer/accept` cagirilir, `platform: 'WEB'` gonderilir
-5. localStorage'e kaydedilir, modal kapanir
-
-**Uyari metni:**
-> "Bu platformda verilen hukuki tavsiyeler yanıltıcı olabilir ve bir avukata danışmanız şiddetle tavsiye edilir."
-
-Sozlesme `finalize` isleminde backend bu kaydı zorunlu tutar — kabul edilmeden PDF/sozlesme sonuclandirilamaz.
+**Sidebar:** Ana Sayfa · Yeni Sözleşme · Sözleşmelerim · Onay Bekleyenler · Kimlik Doğrulama · Ayarlar
 
 ---
 
 ## Takım
 
 - **Deniz Eren ARICI** — Frontend & UI Engineer
-- **Enes Burak ATAY** — Lead & Mobile + Coordinator
+- **Enes Burak ATAY** — Lead & Mobile
 - **Burak DERE** — AI & Data Engineer
