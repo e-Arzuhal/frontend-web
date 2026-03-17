@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api.service';
 
 const STORAGE_KEY = 'disclaimerAccepted_v1.0';
@@ -6,11 +6,14 @@ const STORAGE_KEY = 'disclaimerAccepted_v1.0';
 const DisclaimerBanner = ({ onAccepted }) => {
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Ref ile stale closure'dan kaçınırız; effect yalnızca mount'ta çalışır
+  const onAcceptedRef = useRef(onAccepted);
+  useEffect(() => { onAcceptedRef.current = onAccepted; }, [onAccepted]);
 
   useEffect(() => {
     // Oturumda zaten kabul edildiyse backend'e sorma
     if (localStorage.getItem(STORAGE_KEY)) {
-      onAccepted && onAccepted();
+      onAcceptedRef.current?.();
       return;
     }
     // Backend'den gerçek durum sorgula
@@ -18,13 +21,13 @@ const DisclaimerBanner = ({ onAccepted }) => {
       .then(data => {
         if (data.accepted) {
           localStorage.setItem(STORAGE_KEY, '1');
-          onAccepted && onAccepted();
+          onAcceptedRef.current?.();
         } else {
           setVisible(true);
         }
       })
       .catch(() => setVisible(true)); // backend erişilemiyor → göster
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // yalnızca mount — intentional, ref kullanıyoruz
 
   const handleAccept = async () => {
     setLoading(true);
@@ -32,7 +35,7 @@ const DisclaimerBanner = ({ onAccepted }) => {
       await api.post('/api/disclaimer/accept', { platform: 'WEB' });
       localStorage.setItem(STORAGE_KEY, '1');
       setVisible(false);
-      onAccepted && onAccepted();
+      onAcceptedRef.current?.();
     } catch {
       // Hata durumunda tekrar dene mesajı gösterebiliriz; banner'ı açık bırak
     } finally {

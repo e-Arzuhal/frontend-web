@@ -58,6 +58,7 @@ const isValidTcNo = (tcNo) => {
 const VerificationPage = () => {
   const [verificationStatus, setVerificationStatus] = useState(null); // VerificationResponse
   const [activeMode, setActiveMode] = useState('manual'); // 'manual' | 'camera'
+  const [showNfcModal, setShowNfcModal] = useState(false);
   const [form, setForm] = useState({ tcNo: '', firstName: '', lastName: '', dateOfBirth: '' });
   const [tcError, setTcError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -394,23 +395,62 @@ const VerificationPage = () => {
         )}
       </div>
 
-      {/* Mobil NFC yönlendirmesi */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '14px',
-        padding: '14px 16px', background: 'rgba(200,150,62,0.07)',
-        border: `1px solid rgba(200,150,62,0.25)`, borderRadius: radius.md,
-        marginBottom: '16px',
-      }}>
+      {/* NFC kimlik doğrulama — sadece mobilde mümkün */}
+      <button
+        onClick={() => setShowNfcModal(true)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '14px', width: '100%',
+          padding: '14px 16px', background: 'rgba(200,150,62,0.07)',
+          border: `1px solid rgba(200,150,62,0.30)`, borderRadius: radius.md,
+          marginBottom: '16px', cursor: 'pointer', textAlign: 'left',
+        }}
+      >
         <span style={{ color: colors.accent, flexShrink: 0 }}><NfcIcon size={24} /></span>
-        <div>
+        <div style={{ flex: 1 }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: colors.text, marginBottom: '2px' }}>
-            Daha hızlı doğrulama için mobil uygulamayı kullanın
+            NFC ile Kimlik Doğrulama
           </div>
           <div style={{ fontSize: '12px', color: colors.textSecondary }}>
-            Mobil uygulamada NFC ile kimliğinizi saniyeler içinde doğrulayabilirsiniz.
+            Mobil uygulama gereklidir — detaylar için tıklayın
           </div>
         </div>
-      </div>
+        <span style={{ color: colors.textMuted, fontSize: '18px' }}>›</span>
+      </button>
+
+      {/* NFC Bilgi Modalı */}
+      {showNfcModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15,26,48,0.75)',
+          zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+        }} onClick={() => setShowNfcModal(false)}>
+          <div style={{
+            background: '#fff', borderRadius: '16px', padding: '36px 32px',
+            maxWidth: '480px', width: '100%', textAlign: 'center',
+            boxShadow: '0 20px 60px rgba(15,26,48,0.25)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📱</div>
+            <h3 style={{ fontFamily: `'Playfair Display', serif`, fontSize: '20px', color: colors.text, marginBottom: '12px' }}>
+              NFC Kimlik Doğrulama
+            </h3>
+            <p style={{ fontSize: '14px', color: colors.textSecondary, lineHeight: 1.7, marginBottom: '8px' }}>
+              NFC ile T.C. Kimlik Kartı doğrulaması yalnızca <strong>e-Arzuhal mobil uygulaması</strong> üzerinden yapılabilmektedir.
+            </p>
+            <p style={{ fontSize: '13px', color: colors.textMuted, lineHeight: 1.6, marginBottom: '28px' }}>
+              Web tarayıcıları NFC okuyucusuna güvenli erişim sağlayamaz. Kimliğinizi NFC ile doğrulamak için lütfen mobil uygulamamızı kullanın.
+            </p>
+            <button
+              onClick={() => setShowNfcModal(false)}
+              style={{
+                background: colors.primary, color: colors.accent, border: 'none',
+                borderRadius: '10px', padding: '13px 28px', fontSize: '14px',
+                fontWeight: 600, cursor: 'pointer', width: '100%',
+              }}
+            >
+              Anladım
+            </button>
+          </div>
+        </div>
+      )}
 
       {isCameraActive && (
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
