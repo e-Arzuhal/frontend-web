@@ -98,11 +98,44 @@ const CreateContractPage = ({ onNavigate }) => {
   const handleAnalyze = async () => {
     if (!userInput.trim()) return;
     setIsAnalyzing(true);
-    // NLP server hazır olduğunda: const result = await contractService.analyzeText(userInput);
-    await new Promise(r => setTimeout(r, 1500));
-    setAnalysisResult(mockAnalysis);
-    setCurrentStep(1);
-    setIsAnalyzing(false);
+    try {
+      const realResult = await contractService.analyzeText(userInput);
+      const fields = realResult.nlp_result?.extracted_fields || {};
+      const graphSuggestions = realResult.graphrag_result?.suggestions?.suggestions || [];
+      const matched = realResult.graphrag_result?.analysis?.matched_fields || [];
+      const missing = realResult.graphrag_result?.analysis?.missing_required || [];
+
+      const entityList = [];
+      if (fields.tutar) entityList.push({ label: 'Tutar', type: 'MONEY', value: fields.tutar });
+      if (fields.sure) entityList.push({ label: 'Süre', type: 'DURATION', value: fields.sure });
+      if (fields.tarih) entityList.push({ label: 'Tarih', type: 'DATE', value: fields.tarih });
+      (fields.taraflar || []).forEach((t, i) =>
+        entityList.push({ label: i === 0 ? 'Karşı Taraf' : 'Taraf', type: 'PERSON', value: t })
+      );
+
+      setAnalysisResult({
+        contractType: realResult.contract_type_display?.replace(/_/g, ' ') || realResult.contract_type,
+        contractTypeEn: realResult.contract_type,
+        confidence: realResult.confidence || 0,
+        entities: entityList,
+        mandatoryClauses: [
+          ...matched.map(f => ({ id: f.field_name || f, name: f.name || f.field_name || String(f), description: f.description || '' })),
+          ...missing.map(f => ({ id: f, name: typeof f === 'string' ? f : (f.name || String(f)), description: 'Eksik zorunlu madde', missing: true })),
+        ],
+        suggestedClauses: graphSuggestions.map(s => ({
+          id: s.field_name,
+          name: s.field_name,
+          description: s.message || '',
+          usagePercent: s.usage_percent ?? null,
+          recommended: s.necessity === 'required' || s.necessity === 'recommended',
+        })),
+      });
+      setCurrentStep(1);
+    } catch (e) {
+      alert('Analiz başarısız: ' + (e.message || 'Sunucuya bağlanılamadı.'));
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const toggleClause = (clauseId) => {
@@ -117,14 +150,14 @@ const CreateContractPage = ({ onNavigate }) => {
     try {
       const entities = analysisResult?.entities || [];
       const tutar = entities.find(e => e.type === 'MONEY')?.value || '';
-      const borcAlan = entities.find(e => e.label === 'Borç Alan')?.value || '';
+      const karsıTaraf = entities.find(e => e.label === 'Karşı Taraf' || e.label === 'Borç Alan' || e.type === 'PERSON')?.value || '';
       const saved = await contractService.create({
         title: analysisResult?.contractType || 'Yeni Sözleşme',
-        type: analysisResult?.contractType || 'Genel',
+        type: analysisResult?.contractTypeEn || analysisResult?.contractType || 'GENEL',
         content: userInput,
         amount: tutar,
-        counterpartyName: borcAlan,
-        counterpartyRole: 'Borçlu',
+        counterpartyName: karsıTaraf,
+        counterpartyRole: '',
         selectedClauses,
       });
       setContractId(saved.id);
