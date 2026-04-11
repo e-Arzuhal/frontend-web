@@ -216,6 +216,11 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                       <div>
                         <div style={{ fontSize: '14px', fontWeight: 600 }}>{contract.counterpartyName}</div>
                         <div style={{ fontSize: '12px', color: colors.textMuted }}>{contract.counterpartyRole || 'Karşı Taraf'}</div>
+                        {contract.counterpartyTcKimlik && (
+                          <div style={{ fontSize: '11px', color: colors.textMuted, marginTop: '4px', fontFamily: fonts.mono }}>
+                            TC: {contract.counterpartyTcKimlik.substring(0, 3)}******{contract.counterpartyTcKimlik.substring(9)}
+                          </div>
+                        )}
                       </div>
                       <Badge variant={contract.status === 'APPROVED' ? 'success' : 'warning'}>
                         {contract.status === 'APPROVED' ? 'Onayladı' : 'Bekliyor'}

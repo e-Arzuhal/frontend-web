@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { colors, fonts, radius } from '../styles/tokens';
 import chatbotService from '../services/chatbot.service';
+import useVoiceInput from '../hooks/useVoiceInput';
 
 const SendIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
@@ -17,6 +18,15 @@ const ChatIcon = () => (
 const CloseIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
     <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+const MicIcon = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
+    <rect x="9" y="1" width="6" height="12" rx="3" stroke="currentColor" strokeWidth="2" />
+    <path d="M19 10v1a7 7 0 0 1-14 0v-1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
 
@@ -39,6 +49,17 @@ export default function ChatbotWidget() {
   const [suggested, setSuggested] = useState(SUGGESTED_INITIAL);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  /* ── Voice-to-Text ── */
+  const handleVoiceResult = useCallback((text) => {
+    setInput(prev => prev + (prev && !prev.endsWith(' ') ? ' ' : '') + text);
+  }, []);
+
+  const { isListening, isSupported: voiceSupported, toggleListening } = useVoiceInput({
+    lang: 'tr-TR',
+    continuous: true,
+    onResult: handleVoiceResult,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -307,6 +328,31 @@ export default function ChatbotWidget() {
             >
               <SendIcon />
             </button>
+            {/* Mikrofon butonu — destekleniyorsa göster */}
+            {voiceSupported && (
+              <button
+                onClick={toggleListening}
+                title={isListening ? 'Dinlemeyi durdur' : 'Sesle yaz'}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: radius.md,
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: isListening ? '#ef4444' : colors.surfaceAlt,
+                  color: isListening ? '#fff' : colors.textMuted,
+                  flexShrink: 0,
+                  transition: 'all 0.2s ease',
+                  animation: isListening ? 'micPulse 1.5s ease-in-out infinite' : 'none',
+                  boxShadow: isListening ? '0 0 0 3px rgba(239,68,68,0.25)' : 'none',
+                }}
+              >
+                <MicIcon size={14} />
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -315,6 +361,10 @@ export default function ChatbotWidget() {
         @keyframes bounce {
           0%, 80%, 100% { transform: translateY(0); }
           40% { transform: translateY(-6px); }
+        }
+        @keyframes micPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.08); opacity: 0.85; }
         }
       `}</style>
     </>
