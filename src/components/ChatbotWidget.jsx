@@ -55,7 +55,7 @@ export default function ChatbotWidget() {
     setInput(prev => prev + (prev && !prev.endsWith(' ') ? ' ' : '') + text);
   }, []);
 
-  const { isListening, isSupported: voiceSupported, toggleListening } = useVoiceInput({
+  const { isListening, isSupported: voiceSupported, toggleListening, stopListening } = useVoiceInput({
     lang: 'tr-TR',
     continuous: true,
     onResult: handleVoiceResult,
@@ -64,8 +64,13 @@ export default function ChatbotWidget() {
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 100);
+    } else if (isListening) {
+      // Widget kapatılınca mikrofonu durdur — aksi halde floating button
+      // mount'ta kaldığı için recognition arkada çalışmaya devam eder
+      // (privacy: kullanıcı widget'ı kapattığında dinleme bittiğini varsayar).
+      stopListening();
     }
-  }, [isOpen]);
+  }, [isOpen, isListening, stopListening]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

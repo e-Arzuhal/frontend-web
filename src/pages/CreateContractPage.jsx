@@ -101,12 +101,20 @@ const CreateContractPage = ({ onNavigate }) => {
     setVoiceError(err);
   }, []);
 
-  const { isListening, isSupported: voiceSupported, toggleListening } = useVoiceInput({
+  const { isListening, isSupported: voiceSupported, toggleListening, stopListening } = useVoiceInput({
     lang: 'tr-TR',
     continuous: true,
     onResult: handleVoiceResult,
     onError: handleVoiceError,
   });
+
+  /* Step değişince dinlemeyi durdur — aksi halde kullanıcı 1. adıma
+     geçince mic butonu kaybolur ama recognition arkada çalışmaya devam eder. */
+  useEffect(() => {
+    if (currentStep !== 0 && isListening) {
+      stopListening();
+    }
+  }, [currentStep, isListening, stopListening]);
 
   /* ── Karşı taraf TC doğrulama ── */
   const handleCounterpartyTcChange = (val) => {
@@ -538,7 +546,9 @@ const CreateContractPage = ({ onNavigate }) => {
               variant="accent"
               onClick={handleSaveAndPreview}
               loading={isSaving}
-              disabled={counterpartyTc.length === 11 && !!counterpartyTcError}
+              // Karşı taraf TC'si zorunlu (label `*`) — boş ya da eksik
+              // hane ya da geçersiz kimlik gönderilmesini engelle.
+              disabled={counterpartyTc.length !== 11 || !!counterpartyTcError}
             >
               {isSaving ? 'Oluşturuluyor...' : 'PDF Oluştur'}
             </Button>
@@ -710,21 +720,16 @@ const CreateContractPage = ({ onNavigate }) => {
         </div>
         {steps[currentStep]()}
       </div>
+      {/* Mikrofon pulse animasyonu — import-time global side effect yerine
+          component render'ı ile birlikte DOM'a eklenir. */}
+      <style>{`
+        @keyframes micPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.08); opacity: 0.85; }
+        }
+      `}</style>
     </div>
   );
 };
 
 export default CreateContractPage;
-
-/* Mikrofon pulse animasyonu — global style etiketi ile eklenir */
-if (typeof document !== 'undefined' && !document.getElementById('mic-pulse-style')) {
-  const style = document.createElement('style');
-  style.id = 'mic-pulse-style';
-  style.textContent = `
-    @keyframes micPulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.08); opacity: 0.85; }
-    }
-  `;
-  document.head.appendChild(style);
-}

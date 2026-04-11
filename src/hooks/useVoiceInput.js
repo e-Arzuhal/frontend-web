@@ -70,13 +70,28 @@ export default function useVoiceInput({
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
+    try {
+      // recognition.start() senkron olarak InvalidStateError (zaten çalışıyor)
+      // veya NotAllowedError (izin yok) fırlatabilir — yakalamazsak hook
+      // tutarsız state'te kalır ve kullanıcı tekrar başlatamaz.
+      recognition.start();
+      setIsListening(true);
+    } catch (err) {
+      recognitionRef.current = null;
+      setIsListening(false);
+      if (onErrorRef.current) {
+        onErrorRef.current(`Ses tanıma başlatılamadı: ${err?.message || err}`);
+      }
+    }
   }, [isSupported, lang, continuous]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // zaten durmuşsa sessizce geç
+      }
       recognitionRef.current = null;
     }
     setIsListening(false);

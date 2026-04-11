@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TopBar } from '../components/layout';
 import { Card, Button, Badge } from '../components/ui';
-import { colors, fonts, radius } from '../styles/tokens';
+import { colors, radius } from '../styles/tokens';
 import contractService from '../services/contract.service';
 import verificationService from '../services/verification.service';
 
