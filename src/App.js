@@ -121,7 +121,7 @@ function App() {
       case 'contracts':
         return <ContractsPage onNavigate={handleNavigate} />;
       case 'approvals':
-        return <ApprovalsPage />;
+        return <ApprovalsPage onNavigate={handleNavigate} />;
       case 'settings':
         return <SettingsPage onLogout={handleLogout} />;
       case 'contract-detail':

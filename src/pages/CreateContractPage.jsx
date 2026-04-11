@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TopBar } from '../components/layout';
 import { Card, Button, Badge, TextArea, StepIndicator } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
 import contractService from '../services/contract.service';
+import useVoiceInput from '../hooks/useVoiceInput';
 
 const STEPS = ['Metin Girişi', 'Sözleşme Önerisi', 'PDF Önizleme', 'Onay & İmza'];
 
@@ -53,6 +54,26 @@ const ZoomInIcon = ({ size = 15 }) => (
   </svg>
 );
 
+const MicIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
+    <rect x="9" y="1" width="6" height="12" rx="3" stroke="currentColor" strokeWidth="2" />
+    <path d="M19 10v1a7 7 0 0 1-14 0v-1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+/* ── TC Kimlik frontend doğrulama ── */
+const isValidTcNo = (tcNo) => {
+  if (!/^\d{11}$/.test(tcNo)) return false;
+  if (tcNo[0] === '0') return false;
+  const d = tcNo.split('').map(Number);
+  const d10 = ((7 * (d[0] + d[2] + d[4] + d[6] + d[8]) - (d[1] + d[3] + d[5] + d[7])) % 10 + 10) % 10;
+  if (d[9] !== d10) return false;
+  const sum = d.slice(0, 10).reduce((a, b) => a + b, 0);
+  return d[10] === sum % 10;
+};
+
 const CreateContractPage = ({ onNavigate }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [userInput, setUserInput] = useState('');
@@ -65,6 +86,46 @@ const CreateContractPage = ({ onNavigate }) => {
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState('');
+  const [counterpartyTc, setCounterpartyTc] = useState('');
+  const [counterpartyTcError, setCounterpartyTcError] = useState('');
+  const [counterpartyNameInput, setCounterpartyNameInput] = useState('');
+  const [voiceError, setVoiceError] = useState('');
+
+  /* ── Voice-to-Text ── */
+  const handleVoiceResult = useCallback((text) => {
+    setUserInput(prev => prev + (prev && !prev.endsWith(' ') ? ' ' : '') + text);
+    setVoiceError('');
+  }, []);
+
+  const handleVoiceError = useCallback((err) => {
+    setVoiceError(err);
+  }, []);
+
+  const { isListening, isSupported: voiceSupported, toggleListening, stopListening } = useVoiceInput({
+    lang: 'tr-TR',
+    continuous: true,
+    onResult: handleVoiceResult,
+    onError: handleVoiceError,
+  });
+
+  /* Step değişince dinlemeyi durdur — aksi halde kullanıcı 1. adıma
+     geçince mic butonu kaybolur ama recognition arkada çalışmaya devam eder. */
+  useEffect(() => {
+    if (currentStep !== 0 && isListening) {
+      stopListening();
+    }
+  }, [currentStep, isListening, stopListening]);
+
+  /* ── Karşı taraf TC doğrulama ── */
+  const handleCounterpartyTcChange = (val) => {
+    const digits = val.replace(/\D/g, '').slice(0, 11);
+    setCounterpartyTc(digits);
+    if (digits.length === 11) {
+      setCounterpartyTcError(isValidTcNo(digits) ? '' : 'Geçersiz TC Kimlik Numarası.');
+    } else {
+      setCounterpartyTcError('');
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -156,8 +217,9 @@ const CreateContractPage = ({ onNavigate }) => {
         type: analysisResult?.contractTypeEn || analysisResult?.contractType || 'GENEL',
         content: userInput,
         amount: tutar,
-        counterpartyName: karsıTaraf,
+        counterpartyName: counterpartyNameInput || karsıTaraf,
         counterpartyRole: '',
+        counterpartyTcKimlik: counterpartyTc || null,
         selectedClauses,
       });
       setContractId(saved.id);
@@ -213,14 +275,57 @@ const CreateContractPage = ({ onNavigate }) => {
       <p style={{ fontSize: '14px', color: colors.textSecondary, marginBottom: '24px', lineHeight: 1.6 }}>
         Sözleşme ihtiyacınızı kendi cümlelerinizle açıklayın. Sistem metninizi analiz edecektir.
       </p>
-      <TextArea
-        placeholder="Örnek: Ahmet Yılmaz'a 50.000 TL borç vereceğim..."
-        value={userInput}
-        onChange={(e) => setUserInput(e.target.value)}
-        rows={6}
-        showCount
-        maxLength={2000}
-      />
+      <div style={{ position: 'relative' }}>
+        <TextArea
+          placeholder="Örnek: Ahmet Yılmaz'a 50.000 TL borç vereceğim..."
+          value={userInput}
+          onChange={(e) => setUserInput(e.target.value)}
+          rows={6}
+          showCount
+          maxLength={2000}
+        />
+        {/* Mikrofon butonu — destekleniyorsa göster */}
+        {voiceSupported && (
+          <button
+            onClick={toggleListening}
+            title={isListening ? 'Dinlemeyi durdur' : 'Sesle yaz (Türkçe)'}
+            style={{
+              position: 'absolute', top: '10px', right: '10px',
+              width: '36px', height: '36px', borderRadius: radius.full,
+              border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: isListening ? '#ef4444' : colors.surfaceAlt,
+              color: isListening ? '#fff' : colors.textMuted,
+              transition: 'all 0.2s ease',
+              animation: isListening ? 'micPulse 1.5s ease-in-out infinite' : 'none',
+              boxShadow: isListening ? '0 0 0 4px rgba(239,68,68,0.25)' : 'none',
+            }}
+          >
+            <MicIcon size={18} />
+          </button>
+        )}
+      </div>
+      {voiceError && (
+        <div style={{
+          padding: '8px 12px', marginTop: '8px',
+          background: colors.errorBg, color: colors.error,
+          borderRadius: radius.md, fontSize: '12px',
+        }}>
+          {voiceError}
+        </div>
+      )}
+      {isListening && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          marginTop: '8px', fontSize: '13px', color: '#ef4444', fontWeight: 500,
+        }}>
+          <span style={{
+            width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444',
+            animation: 'micPulse 1s ease-in-out infinite',
+          }} />
+          Dinleniyor... Konuşmanız metne dönüştürülüyor.
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
         <Button variant="accent" onClick={handleAnalyze} loading={isAnalyzing} disabled={!userInput.trim()}>
           {isAnalyzing ? 'Analiz Ediliyor...' : 'Analiz Et'}
@@ -375,6 +480,57 @@ const CreateContractPage = ({ onNavigate }) => {
             );
           })}
 
+          {/* Karşı Taraf Bilgileri */}
+          <Card style={{ padding: '20px', marginBottom: '16px', border: `1px solid ${colors.accent}33` }}>
+            <h4 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '14px', color: colors.accent }}>Karşı Taraf Bilgileri</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: colors.textSecondary, marginBottom: '6px' }}>
+                  Karşı Taraf TC Kimlik No *
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={11}
+                  placeholder="12345678901"
+                  value={counterpartyTc}
+                  onChange={e => handleCounterpartyTcChange(e.target.value)}
+                  style={{
+                    width: '100%', padding: '9px 12px',
+                    background: colors.surfaceAlt, border: `1px solid ${counterpartyTcError ? colors.error : colors.border}`,
+                    borderRadius: radius.md, color: colors.text,
+                    fontFamily: fonts.body, fontSize: '14px', letterSpacing: '2px',
+                    outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+                {counterpartyTcError && (
+                  <p style={{ fontSize: '11px', color: colors.error, marginTop: '4px' }}>{counterpartyTcError}</p>
+                )}
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: colors.textSecondary, marginBottom: '6px' }}>
+                  Karşı Taraf Ad Soyad
+                </label>
+                <input
+                  type="text"
+                  placeholder="Karşı tarafın adı soyadı"
+                  value={counterpartyNameInput}
+                  onChange={e => setCounterpartyNameInput(e.target.value)}
+                  style={{
+                    width: '100%', padding: '9px 12px',
+                    background: colors.surfaceAlt, border: `1px solid ${colors.border}`,
+                    borderRadius: radius.md, color: colors.text,
+                    fontFamily: fonts.body, fontSize: '14px',
+                    outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+            <p style={{ fontSize: '11px', color: colors.textMuted, marginTop: '10px', lineHeight: 1.5 }}>
+              Karşı tarafın TC Kimlik Numarası ile sözleşme onay talebi karşı tarafa iletilecektir.
+            </p>
+          </Card>
+
           {saveError && (
             <div style={{
               padding: '12px', background: colors.errorBg, color: colors.error,
@@ -386,7 +542,14 @@ const CreateContractPage = ({ onNavigate }) => {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px' }}>
             <Button variant="outline" onClick={() => setCurrentStep(0)}>Geri</Button>
-            <Button variant="accent" onClick={handleSaveAndPreview} loading={isSaving}>
+            <Button
+              variant="accent"
+              onClick={handleSaveAndPreview}
+              loading={isSaving}
+              // Karşı taraf TC'si zorunlu (label `*`) — boş ya da eksik
+              // hane ya da geçersiz kimlik gönderilmesini engelle.
+              disabled={counterpartyTc.length !== 11 || !!counterpartyTcError}
+            >
               {isSaving ? 'Oluşturuluyor...' : 'PDF Oluştur'}
             </Button>
           </div>
@@ -557,6 +720,14 @@ const CreateContractPage = ({ onNavigate }) => {
         </div>
         {steps[currentStep]()}
       </div>
+      {/* Mikrofon pulse animasyonu — import-time global side effect yerine
+          component render'ı ile birlikte DOM'a eklenir. */}
+      <style>{`
+        @keyframes micPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.08); opacity: 0.85; }
+        }
+      `}</style>
     </div>
   );
 };
