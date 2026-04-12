@@ -80,6 +80,7 @@ const CreateContractPage = ({ onNavigate }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [selectedClauses, setSelectedClauses] = useState([]);
+  const [missingFieldValues, setMissingFieldValues] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [contractId, setContractId] = useState(null);
@@ -179,10 +180,16 @@ const CreateContractPage = ({ onNavigate }) => {
         contractTypeEn: realResult.contract_type,
         confidence: realResult.confidence || 0,
         entities: entityList,
-        mandatoryClauses: [
-          ...matched.map(f => ({ id: f.field_name || f, name: f.name || f.field_name || String(f), description: f.description || '' })),
-          ...missing.map(f => ({ id: f, name: typeof f === 'string' ? f : (f.name || String(f)), description: 'Eksik zorunlu madde', missing: true })),
-        ],
+        mandatoryClauses: matched.map(f => ({
+          id: f.field_name || f,
+          name: f.name || f.field_name || String(f),
+          description: f.description || '',
+        })),
+        missingClauses: missing.map(f => ({
+          id: typeof f === 'string' ? f : (f.field_name || f.name || String(f)),
+          name: typeof f === 'string' ? f : (f.name || f.field_name || String(f)),
+          description: typeof f === 'object' ? (f.description || '') : '',
+        })),
         suggestedClauses: graphSuggestions.map(s => ({
           id: s.field_name,
           name: s.field_name,
@@ -191,6 +198,7 @@ const CreateContractPage = ({ onNavigate }) => {
           recommended: s.necessity === 'required' || s.necessity === 'recommended',
         })),
       });
+      setMissingFieldValues({});
       setCurrentStep(1);
     } catch (e) {
       alert('Analiz başarısız: ' + (e.message || 'Sunucuya bağlanılamadı.'));
@@ -205,6 +213,28 @@ const CreateContractPage = ({ onNavigate }) => {
     );
   };
 
+  const getEnrichedContent = () => {
+    let content = userInput;
+
+    // Eksik zorunlu maddeler — kullanıcının doldurduğu değerleri ekle
+    const missingClauses = analysisResult?.missingClauses || [];
+    const filledMissing = missingClauses.filter(c => missingFieldValues[c.id]?.trim());
+    if (filledMissing.length > 0) {
+      const additions = filledMissing.map(c => `\n\n[${c.name}]: ${missingFieldValues[c.id].trim()}`).join('');
+      content += '\n\n--- Eksik Maddeler ---' + additions;
+    }
+
+    // Seçilen önerilen maddeler
+    const suggestions = analysisResult?.suggestedClauses || [];
+    const selected = suggestions.filter(s => selectedClauses.includes(s.id));
+    if (selected.length > 0) {
+      const additions = selected.map(s => `\n\n[${s.name}]: ${s.description}`).join('');
+      content += '\n\n--- Ek Maddeler ---' + additions;
+    }
+
+    return content;
+  };
+
   const handleSaveAndPreview = async () => {
     setIsSaving(true);
     setSaveError('');
@@ -215,12 +245,11 @@ const CreateContractPage = ({ onNavigate }) => {
       const saved = await contractService.create({
         title: analysisResult?.contractType || 'Yeni Sözleşme',
         type: analysisResult?.contractTypeEn || analysisResult?.contractType || 'GENEL',
-        content: userInput,
+        content: getEnrichedContent(),
         amount: tutar,
         counterpartyName: counterpartyNameInput || karsıTaraf,
         counterpartyRole: '',
         counterpartyTcKimlik: counterpartyTc || null,
-        selectedClauses,
       });
       setContractId(saved.id);
       setCurrentStep(2);
@@ -261,6 +290,7 @@ const CreateContractPage = ({ onNavigate }) => {
     setUserInput('');
     setAnalysisResult(null);
     setSelectedClauses([]);
+    setMissingFieldValues({});
     setSaveError('');
     setContractId(null);
     setPdfBlobUrl(null);
@@ -337,6 +367,7 @@ const CreateContractPage = ({ onNavigate }) => {
   const renderStep1 = () => {
     const entities = analysisResult?.entities || [];
     const mandatory = analysisResult?.mandatoryClauses || [];
+    const missingClauses = analysisResult?.missingClauses || [];
     const suggested = analysisResult?.suggestedClauses || [];
 
     return (
@@ -425,6 +456,47 @@ const CreateContractPage = ({ onNavigate }) => {
               GraphRAG bilgi grafiği analizi sonucu önerilen opsiyonel ve tavsiye edilen maddeler. Eklemek istediklerinizi seçin.
             </p>
           </div>
+
+          {/* Eksik Zorunlu Maddeler — kullanıcıdan input al */}
+          {missingClauses.length > 0 && (
+            <Card style={{ padding: '16px 18px', marginBottom: '16px', border: `1.5px solid ${colors.error}44` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                <span style={{ color: colors.error, display: 'inline-flex' }}><ZapIcon /></span>
+                <h4 style={{ fontSize: '14px', fontWeight: 700, color: colors.error, margin: 0 }}>
+                  Eksik Zorunlu Maddeler
+                </h4>
+              </div>
+              <p style={{ fontSize: '12px', color: colors.textSecondary, marginBottom: '14px', lineHeight: 1.5 }}>
+                Aşağıdaki zorunlu alanlar sözleşme metninde tespit edilemedi. Lütfen doldurun.
+              </p>
+              {missingClauses.map(clause => (
+                <div key={clause.id} style={{ marginBottom: '12px' }}>
+                  <label style={{
+                    display: 'block', fontSize: '12px', fontWeight: 600,
+                    color: colors.text, marginBottom: '6px',
+                  }}>
+                    {clause.name} *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={clause.description || `${clause.name} bilgisini girin`}
+                    value={missingFieldValues[clause.id] || ''}
+                    onChange={e => setMissingFieldValues(prev => ({ ...prev, [clause.id]: e.target.value }))}
+                    style={{
+                      width: '100%', padding: '9px 12px',
+                      background: colors.surfaceAlt,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: radius.md, color: colors.text,
+                      fontFamily: fonts.body, fontSize: '13px',
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                    onFocus={e => { e.target.style.borderColor = colors.accent; }}
+                    onBlur={e => { e.target.style.borderColor = colors.border; }}
+                  />
+                </div>
+              ))}
+            </Card>
+          )}
 
           {suggested.map(clause => {
             const isChecked = selectedClauses.includes(clause.id);
@@ -558,7 +630,8 @@ const CreateContractPage = ({ onNavigate }) => {
     );
   };
 
-  const clauseCount = (analysisResult?.mandatoryClauses?.length || 0) + selectedClauses.length;
+  const filledMissingCount = Object.values(missingFieldValues).filter(v => v?.trim()).length;
+  const clauseCount = (analysisResult?.mandatoryClauses?.length || 0) + filledMissingCount + selectedClauses.length;
 
   const renderStep2 = () => (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px', alignItems: 'start' }}>
