@@ -776,7 +776,7 @@ const CreateContractPage = ({ onNavigate }) => {
 
   return (
     <div style={{ animation: 'fadeInUp 0.35s ease' }}>
-      <TopBar title="Yeni Sözleşme Oluştur" subtitle="Doğal dilde yazın; sözleşme taslağını hızlıca oluşturun." />
+      <TopBar title="Yeni Sözleşme Oluştur" subtitle="Doğal dilde yazın; sözleşme taslağını hızlıca oluşturun." onNavigate={onNavigate} />
       <div style={{ padding: '28px 32px', maxWidth: containerMaxWidth, margin: '0 auto' }}>
         <div style={{ marginBottom: '32px' }}>
           <StepIndicator steps={STEPS} currentStep={currentStep} />

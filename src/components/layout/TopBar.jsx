@@ -1,7 +1,8 @@
 import React from 'react';
 import { colors, fonts } from '../../styles/tokens';
+import NotificationBell from './NotificationBell';
 
-const TopBar = ({ title, subtitle, actions }) => {
+const TopBar = ({ title, subtitle, actions, onNavigate }) => {
   return (
     <header style={{
       display: 'flex',
@@ -18,7 +19,10 @@ const TopBar = ({ title, subtitle, actions }) => {
         <h1 style={{ fontFamily: fonts.heading, fontSize: '24px', fontWeight: 600, color: colors.text, margin: 0 }}>{title}</h1>
         {subtitle && <p style={{ fontSize: '14px', color: colors.textSecondary, margin: '4px 0 0 0' }}>{subtitle}</p>}
       </div>
-      {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>{actions}</div>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <NotificationBell onNavigate={onNavigate} />
+        {actions}
+      </div>
     </header>
   );
 };

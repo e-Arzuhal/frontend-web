@@ -185,14 +185,15 @@ const SettingsPage = ({ onLogout }) => {
           <div style={{ fontSize: '13px', color: colors.textSecondary, marginBottom: '14px', lineHeight: 1.55 }}>
             Hesabınızı silmek geri alınamaz bir işlemdir. Tüm verileriniz kalıcı olarak silinecektir.
           </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
           <Button
             variant="outline"
-            fullWidth
             style={{ borderColor: colors.error, color: colors.error, background: 'transparent' }}
             onClick={() => {}}
           >
             Hesabı Sil
           </Button>
+          </div>
         </Card>
       </div>
     </div>

@@ -61,7 +61,17 @@ const DashboardPage = ({ onNavigate }) => {
       <TopBar
         title="Genel Bakış"
         subtitle={`Hoş geldiniz. ${pendingCount > 0 ? `Bugün ${pendingCount} işlem bekliyor.` : 'Bekleyen işlem yok.'}`}
-        actions={<Button variant="accent" onClick={() => onNavigate('create')}>Yeni Sözleşme</Button>}
+        onNavigate={onNavigate}
+        actions={(
+          <>
+            {pendingCount > 0 && (
+              <Button variant="outline" onClick={() => onNavigate('approvals')}>
+                Onay Bekleyenleri Aç
+              </Button>
+            )}
+            <Button variant="accent" onClick={() => onNavigate('create')}>Yeni Sözleşme</Button>
+          </>
+        )}
       />
 
       <div style={{ padding: '28px 32px' }}>
