@@ -134,29 +134,6 @@ const CreateContractPage = ({ onNavigate }) => {
     };
   }, [pdfBlobUrl]);
 
-  const mockAnalysis = {
-    contractType: 'Borç Sözleşmesi',
-    contractTypeEn: 'Loan Agreement',
-    confidence: 0.92,
-    entities: [
-      { label: 'Borç Veren', type: 'PERSON', value: 'Kullanıcı' },
-      { label: 'Borç Alan', type: 'PERSON', value: 'Ahmet Yılmaz' },
-      { label: 'Tutar', type: 'MONEY', value: '50.000 TL' },
-      { label: 'Tarih', type: 'DATE', value: '01.06.2026' },
-    ],
-    mandatoryClauses: [
-      { id: 1, name: 'Borç Tutarı', description: 'Borç verilen miktar ve para birimi' },
-      { id: 2, name: 'Geri Ödeme Tarihi', description: 'Son ödeme tarihi' },
-      { id: 3, name: 'Taraflar', description: 'Borç veren ve borç alan bilgileri' },
-    ],
-    suggestedClauses: [
-      { id: 'faiz', name: 'Faiz Oranı', description: 'Aylık/yıllık faiz oranı belirlenmesi', usagePercent: 72, recommended: true },
-      { id: 'temerrut', name: 'Temerrüt Koşulları', description: 'Ödeme gecikmesi durumunda uygulanacak yaptırımlar', usagePercent: 65, recommended: true },
-      { id: 'tanik', name: 'Tanıklar', description: 'Sözleşmeye tanık eklenmesi', usagePercent: 38, recommended: false },
-      { id: 'odeme_plani', name: 'Ödeme Planı', description: 'Taksitli ödeme takvimi', usagePercent: 45, recommended: false },
-    ],
-  };
-
   const handleAnalyze = async () => {
     if (!userInput.trim()) return;
     setIsAnalyzing(true);
@@ -776,7 +753,7 @@ const CreateContractPage = ({ onNavigate }) => {
 
   return (
     <div style={{ animation: 'fadeInUp 0.35s ease' }}>
-      <TopBar title="Yeni Sözleşme Oluştur" subtitle="Doğal dilde yazın; sözleşme taslağını hızlıca oluşturun." />
+      <TopBar title="Yeni Sözleşme Oluştur" subtitle="Doğal dilde yazın; sözleşme taslağını hızlıca oluşturun." onNavigate={onNavigate} />
       <div style={{ padding: '28px 32px', maxWidth: containerMaxWidth, margin: '0 auto' }}>
         <div style={{ marginBottom: '32px' }}>
           <StepIndicator steps={STEPS} currentStep={currentStep} />

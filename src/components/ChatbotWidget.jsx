@@ -148,7 +148,7 @@ export default function ChatbotWidget() {
           right: '28px',
           width: '360px',
           height: '520px',
-          background: colors.card,
+          background: colors.surface,
           borderRadius: radius.xl,
           boxShadow: '0 8px 40px rgba(27,42,74,0.18)',
           display: 'flex',

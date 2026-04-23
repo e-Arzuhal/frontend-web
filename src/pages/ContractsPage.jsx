@@ -58,6 +58,7 @@ const ContractsPage = ({ onNavigate }) => {
       <TopBar
         title="Sözleşmelerim"
         subtitle={`Toplam ${contracts.length} sözleşme`}
+        onNavigate={onNavigate}
         actions={<Button variant="accent" onClick={() => onNavigate && onNavigate('create')}>Yeni Sözleşme</Button>}
       />
 
