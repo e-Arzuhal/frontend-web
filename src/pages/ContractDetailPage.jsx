@@ -12,11 +12,136 @@ const DownloadIcon = ({ size = 16 }) => (
   </svg>
 );
 
+const PdfConfirmModal = ({ data, onConfirm, onCancel, isDownloading }) => {
+  const overlayStyle = {
+    position: 'fixed', inset: 0, zIndex: 1000,
+    background: 'rgba(0,0,0,0.5)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '24px',
+  };
+  const modalStyle = {
+    background: colors.surface,
+    borderRadius: radius.lg,
+    padding: '32px',
+    maxWidth: '520px',
+    width: '100%',
+    maxHeight: '85vh',
+    overflowY: 'auto',
+  };
+  const rowStyle = {
+    display: 'flex', justifyContent: 'space-between',
+    padding: '10px 14px',
+    background: colors.surfaceAlt,
+    borderRadius: radius.md,
+    marginBottom: '8px',
+    fontSize: '14px',
+  };
+
+  return (
+    <div style={overlayStyle} onClick={onCancel}>
+      <div style={modalStyle} onClick={e => e.stopPropagation()}>
+        <h2 style={{ fontFamily: fonts.heading, fontSize: '20px', fontWeight: 600, marginBottom: '6px' }}>
+          PDF Oluşturma Onayı
+        </h2>
+        <p style={{ fontSize: '13px', color: colors.textSecondary, marginBottom: '24px' }}>
+          Aşağıdaki bilgilerle PDF oluşturulacak. Lütfen doğrulayın.
+        </p>
+
+        <div style={{ marginBottom: '20px' }}>
+          <div style={rowStyle}>
+            <span style={{ color: colors.textSecondary }}>Başlık</span>
+            <span style={{ fontWeight: 600 }}>{data.title}</span>
+          </div>
+          <div style={rowStyle}>
+            <span style={{ color: colors.textSecondary }}>Tür</span>
+            <span style={{ fontWeight: 600 }}>{data.contractType}</span>
+          </div>
+          {data.amount && (
+            <div style={rowStyle}>
+              <span style={{ color: colors.textSecondary }}>Tutar</span>
+              <span style={{ fontWeight: 600 }}>{data.amount}</span>
+            </div>
+          )}
+          {data.owner && (
+            <div style={rowStyle}>
+              <span style={{ color: colors.textSecondary }}>Oluşturan</span>
+              <span style={{ fontWeight: 600 }}>{data.owner.displayName}</span>
+            </div>
+          )}
+          {data.counterparty && (
+            <div style={rowStyle}>
+              <span style={{ color: colors.textSecondary }}>Karşı Taraf</span>
+              <span style={{ fontWeight: 600 }}>
+                {data.counterparty.displayName}
+                {data.counterparty.tcMasked && (
+                  <span style={{ fontFamily: fonts.mono, fontSize: '11px', color: colors.textMuted, marginLeft: '6px' }}>
+                    ({data.counterparty.tcMasked})
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+          {data.contentPreview && (
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ fontSize: '12px', color: colors.textMuted, marginBottom: '6px' }}>
+                İçerik önizlemesi ({data.contentLength} karakter)
+              </div>
+              <div style={{
+                padding: '12px', background: colors.surfaceAlt, borderRadius: radius.md,
+                fontSize: '12px', lineHeight: 1.6, color: colors.textSecondary,
+                whiteSpace: 'pre-wrap',
+              }}>
+                {data.contentPreview}{data.contentLength > 300 ? '…' : ''}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {data.warnings && data.warnings.length > 0 && (
+          <div style={{
+            padding: '12px 16px', marginBottom: '20px',
+            background: 'rgba(232, 200, 130, 0.12)',
+            border: '1px solid rgba(232, 200, 130, 0.5)',
+            borderRadius: radius.md,
+          }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#7a6535', marginBottom: '6px' }}>
+              ⚠️ Uyarılar
+            </div>
+            {data.warnings.map((w, i) => (
+              <div key={i} style={{ fontSize: '12px', color: '#7a6535', lineHeight: 1.5 }}>• {w}</div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <Button variant="outline" fullWidth onClick={onCancel}>İptal</Button>
+          <Button
+            variant="accent"
+            fullWidth
+            onClick={onConfirm}
+            loading={isDownloading}
+            disabled={!data.readyForPdf || isDownloading}
+          >
+            {isDownloading ? 'İndiriliyor...' : 'Onayla ve İndir'}
+          </Button>
+        </div>
+        {!data.readyForPdf && (
+          <p style={{ fontSize: '12px', color: colors.error, textAlign: 'center', marginTop: '10px' }}>
+            PDF oluşturulamıyor — yukarıdaki uyarıları giderin.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ContractDetailPage = ({ contractId, onBack }) => {
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isPdfDownloading, setIsPdfDownloading] = useState(false);
+  const [pdfConfirmData, setPdfConfirmData] = useState(null);
+  const [isPdfConfirmLoading, setIsPdfConfirmLoading] = useState(false);
 
   useEffect(() => {
     const fetchContract = async () => {
@@ -47,6 +172,18 @@ const ContractDetailPage = ({ contractId, onBack }) => {
   };
 
   const handleDownloadPdf = async () => {
+    setIsPdfConfirmLoading(true);
+    try {
+      const data = await contractService.getPdfConfirm(contract.id);
+      setPdfConfirmData(data);
+    } catch (err) {
+      console.error('PDF confirm fetch error:', err);
+    } finally {
+      setIsPdfConfirmLoading(false);
+    }
+  };
+
+  const handlePdfDownloadConfirmed = async () => {
     setIsPdfDownloading(true);
     try {
       const blob = await contractService.downloadPdf(contract.id);
@@ -56,6 +193,7 @@ const ContractDetailPage = ({ contractId, onBack }) => {
       a.download = `sozlesme-${String(contract.id).padStart(6, '0')}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+      setPdfConfirmData(null);
     } catch (err) {
       console.error('PDF download error:', err);
     } finally {
@@ -91,6 +229,14 @@ const ContractDetailPage = ({ contractId, onBack }) => {
 
   return (
     <div style={{ animation: 'fadeInUp 0.4s ease' }}>
+      {pdfConfirmData && (
+        <PdfConfirmModal
+          data={pdfConfirmData}
+          onConfirm={handlePdfDownloadConfirmed}
+          onCancel={() => setPdfConfirmData(null)}
+          isDownloading={isPdfDownloading}
+        />
+      )}
       <TopBar
         title={contract.title}
         subtitle={`Oluşturulma: ${formatDate(contract.createdAt)}`}
@@ -258,9 +404,9 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                     </Button>
                   </>
                 )}
-                <Button variant="outline" fullWidth onClick={handleDownloadPdf} loading={isPdfDownloading}>
+                <Button variant="outline" fullWidth onClick={handleDownloadPdf} loading={isPdfConfirmLoading}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <DownloadIcon /> {isPdfDownloading ? 'İndiriliyor...' : 'PDF İndir'}
+                    <DownloadIcon /> {isPdfConfirmLoading ? 'Hazırlanıyor...' : 'PDF İndir'}
                   </span>
                 </Button>
                 <Button variant="outline" fullWidth onClick={onBack}>Sözleşmelere Dön</Button>
