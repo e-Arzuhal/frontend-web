@@ -51,6 +51,12 @@ const SettingsPage = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('profile');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [notifSaveSuccess, setNotifSaveSuccess] = useState(false);
+  const [notifSaveError, setNotifSaveError] = useState('');
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [securitySuccess, setSecuritySuccess] = useState(false);
+  const [securityError, setSecurityError] = useState('');
+  const [securityLoading, setSecurityLoading] = useState(false);
 
   const currentUser = authService.getCurrentUser();
 
@@ -82,6 +88,35 @@ const SettingsPage = ({ onLogout }) => {
     marketing: false,
   });
 
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    api.get('/api/users/me/notification-preferences')
+      .then((data) => {
+        if (!mounted || !data) return;
+        setNotifications({
+          email: !!data.email,
+          sms: !!data.sms,
+          push: !!data.push,
+          contractUpdates: !!data.contractUpdates,
+          approvalRequests: !!data.approvalRequests,
+          marketing: !!data.marketing,
+        });
+      })
+      .catch(() => {
+        // Sessiz fallback: UI varsayılanlarıyla devam etsin
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const toggleSetting = (key) => setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const tabs = useMemo(() => ([
@@ -111,6 +146,77 @@ const SettingsPage = ({ onLogout }) => {
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       setSaveError(err.message || 'Profil güncellenemedi.');
+    }
+  };
+
+  const handleSaveNotifications = async () => {
+    setNotifSaveSuccess(false);
+    setNotifSaveError('');
+    setNotifLoading(true);
+    try {
+      await api.put('/api/users/me/notification-preferences', notifications);
+      setNotifSaveSuccess(true);
+      setTimeout(() => setNotifSaveSuccess(false), 3000);
+    } catch (err) {
+      setNotifSaveError(err.message || 'Bildirim tercihleri kaydedilemedi.');
+    } finally {
+      setNotifLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    setSecuritySuccess(false);
+    setSecurityError('');
+
+    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
+      setSecurityError('Lütfen mevcut ve yeni şifre alanlarını doldurun.');
+      return;
+    }
+    if (passwordForm.newPassword.length < 8) {
+      setSecurityError('Yeni şifre en az 8 karakter olmalıdır.');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setSecurityError('Yeni şifre ve tekrar şifresi eşleşmiyor.');
+      return;
+    }
+
+    setSecurityLoading(true);
+    try {
+      await api.put('/api/users/me/password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setSecuritySuccess(true);
+    } catch (err) {
+      setSecurityError(err.message || 'Şifre güncellenemedi.');
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const handleLogoutCurrentSession = async () => {
+    try {
+      await api.post('/api/auth/logout', {});
+    } catch (_) {
+      // Çıkış endpoint'i hata verse de yerel çıkış yapılır.
+    } finally {
+      authService.logout();
+      onLogout?.();
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm('Hesabınızı kalıcı olarak silmek istediğinize emin misiniz?');
+    if (!confirmed) return;
+
+    try {
+      await api.delete('/api/users/me');
+      authService.logout();
+      onLogout?.();
+    } catch (err) {
+      setSecurityError(err.message || 'Hesap silinemedi.');
     }
   };
 
@@ -148,12 +254,33 @@ const SettingsPage = ({ onLogout }) => {
       <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '20px' }}>Güvenlik Ayarları</h3>
 
       <Card style={{ padding: '18px', marginBottom: '14px', background: colors.surfaceAlt }} hover={false}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px' }}>Şifre Değiştir</div>
-            <div style={{ fontSize: '13px', color: colors.textSecondary }}>Son değişiklik: 30 gün önce</div>
+        <div>
+          <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px' }}>Şifre Değiştir</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <Input
+              label="Mevcut Şifre"
+              type="password"
+              value={passwordForm.currentPassword}
+              onChange={(e) => setPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))}
+            />
+            <Input
+              label="Yeni Şifre"
+              type="password"
+              value={passwordForm.newPassword}
+              onChange={(e) => setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))}
+            />
           </div>
-          <Button variant="outline" size="sm">Değiştir</Button>
+          <Input
+            label="Yeni Şifre (Tekrar)"
+            type="password"
+            value={passwordForm.confirmPassword}
+            onChange={(e) => setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+            <Button variant="accent" size="sm" onClick={handleChangePassword} disabled={securityLoading}>
+              {securityLoading ? 'Kaydediliyor...' : 'Şifreyi Güncelle'}
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -173,9 +300,22 @@ const SettingsPage = ({ onLogout }) => {
             <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px' }}>Aktif Oturumlar</div>
             <div style={{ fontSize: '13px', color: colors.textSecondary }}>1 cihazda aktif oturum bulunuyor</div>
           </div>
-          <Button variant="ghost" size="sm" style={{ color: colors.error }}>Tümünü Kapat</Button>
+          <Button variant="ghost" size="sm" style={{ color: colors.error }} onClick={handleLogoutCurrentSession}>
+            Bu Oturumu Kapat
+          </Button>
         </div>
       </Card>
+
+      {securitySuccess && (
+        <div style={{ padding: '12px', background: colors.successBg, color: colors.success, borderRadius: radius.md, fontSize: '13px', marginTop: '12px' }}>
+          Güvenlik ayarları güncellendi.
+        </div>
+      )}
+      {securityError && (
+        <div style={{ padding: '12px', background: colors.errorBg, color: colors.error, borderRadius: radius.md, fontSize: '13px', marginTop: '12px' }}>
+          {securityError}
+        </div>
+      )}
 
       <div style={{ marginTop: '18px' }}>
         <div style={{ fontSize: '12px', fontWeight: 800, color: colors.textSecondary, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
@@ -189,7 +329,7 @@ const SettingsPage = ({ onLogout }) => {
           <Button
             variant="outline"
             style={{ borderColor: colors.error, color: colors.error, background: 'transparent' }}
-            onClick={() => {}}
+            onClick={handleDeleteAccount}
           >
             Hesabı Sil
           </Button>
@@ -220,6 +360,23 @@ const SettingsPage = ({ onLogout }) => {
         <SettingRow label="Onay Talepleri" description="Yeni onay bekleyen sözleşmeler" checked={notifications.approvalRequests} onToggle={() => toggleSetting('approvalRequests')} />
         <SettingRow label="Pazarlama" description="Yenilikler ve kampanyalar" checked={notifications.marketing} onToggle={() => toggleSetting('marketing')} isLast />
       </Card>
+
+      {notifSaveSuccess && (
+        <div style={{ padding: '12px', background: colors.successBg, color: colors.success, borderRadius: radius.md, fontSize: '13px', marginTop: '12px' }}>
+          Bildirim tercihleri kaydedildi.
+        </div>
+      )}
+      {notifSaveError && (
+        <div style={{ padding: '12px', background: colors.errorBg, color: colors.error, borderRadius: radius.md, fontSize: '13px', marginTop: '12px' }}>
+          {notifSaveError}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+        <Button variant="accent" onClick={handleSaveNotifications} disabled={notifLoading}>
+          {notifLoading ? 'Kaydediliyor...' : 'Tercihleri Kaydet'}
+        </Button>
+      </div>
     </div>
   );
 
