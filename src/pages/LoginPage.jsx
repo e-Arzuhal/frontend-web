@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Button, Input } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
 import authService from '../services/auth.service';
@@ -22,7 +23,8 @@ const LockIcon = ({ size = 18 }) => (
   </svg>
 );
 
-const LoginPage = ({ onLogin, onNavigate }) => {
+const LoginPage = ({ onLogin }) => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -169,7 +171,7 @@ const LoginPage = ({ onLogin, onNavigate }) => {
               Hesabınız yok mu?{' '}
               <button
                 type="button"
-                onClick={() => onNavigate('register')}
+                onClick={() => navigate('/register')}
                 style={{
                   background: 'none',
                   border: 'none',

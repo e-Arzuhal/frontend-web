@@ -142,6 +142,7 @@ const ContractDetailPage = ({ contractId, onBack }) => {
   const [isPdfDownloading, setIsPdfDownloading] = useState(false);
   const [pdfConfirmData, setPdfConfirmData] = useState(null);
   const [isPdfConfirmLoading, setIsPdfConfirmLoading] = useState(false);
+  const [actionError, setActionError] = useState(null);
 
   useEffect(() => {
     const fetchContract = async () => {
@@ -172,18 +173,20 @@ const ContractDetailPage = ({ contractId, onBack }) => {
   };
 
   const handleDownloadPdf = async () => {
+    setActionError(null);
     setIsPdfConfirmLoading(true);
     try {
       const data = await contractService.getPdfConfirm(contract.id);
       setPdfConfirmData(data);
     } catch (err) {
-      console.error('PDF confirm fetch error:', err);
+      setActionError('PDF hazırlanırken hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setIsPdfConfirmLoading(false);
     }
   };
 
   const handlePdfDownloadConfirmed = async () => {
+    setActionError(null);
     setIsPdfDownloading(true);
     try {
       const blob = await contractService.downloadPdf(contract.id);
@@ -195,7 +198,7 @@ const ContractDetailPage = ({ contractId, onBack }) => {
       URL.revokeObjectURL(url);
       setPdfConfirmData(null);
     } catch (err) {
-      console.error('PDF download error:', err);
+      setActionError('PDF indirilirken hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setIsPdfDownloading(false);
     }
@@ -380,6 +383,17 @@ const ContractDetailPage = ({ contractId, onBack }) => {
             {/* Hizli Islemler */}
             <Card style={{ padding: '24px' }} hover={false}>
               <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>İşlemler</h3>
+              {actionError && (
+                <div style={{
+                  padding: '10px 14px', marginBottom: '12px',
+                  background: 'rgba(220,53,69,0.08)',
+                  border: `1px solid ${colors.error}`,
+                  borderRadius: '8px', fontSize: '12px', color: colors.error,
+                  lineHeight: 1.5,
+                }}>
+                  {actionError}
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {contract.status === 'DRAFT' && (
                   <>
@@ -393,11 +407,12 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                       ⚠️ Onaya göndermeden önce sözleşmeyi bir avukata inceletmenizi öneririz.
                     </div>
                     <Button variant="accent" fullWidth onClick={async () => {
+                      setActionError(null);
                       try {
                         const updated = await contractService.finalize(contract.id);
                         setContract(updated);
                       } catch (err) {
-                        console.error('Finalize error:', err);
+                        setActionError(err?.response?.data?.message || err.message || 'Onaya gönderme başarısız.');
                       }
                     }}>
                       Onaya Gönder
@@ -411,11 +426,12 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                 </Button>
                 <Button variant="outline" fullWidth onClick={onBack}>Sözleşmelere Dön</Button>
                 <Button variant="ghost" fullWidth style={{ color: colors.error }} onClick={async () => {
+                  setActionError(null);
                   try {
                     await contractService.delete(contract.id);
                     onBack();
                   } catch (err) {
-                    console.error('Delete error:', err);
+                    setActionError(err?.response?.data?.message || err.message || 'Sözleşme silinemedi.');
                   }
                 }}>
                   Sözleşmeyi Sil

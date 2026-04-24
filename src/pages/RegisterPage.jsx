@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Button, Input } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
 import authService from '../services/auth.service';
@@ -42,7 +43,8 @@ const ArrowRightIcon = ({ size = 18 }) => (
   </svg>
 );
 
-const RegisterPage = ({ onRegister, onNavigate }) => {
+const RegisterPage = ({ onRegister }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -305,7 +307,7 @@ const RegisterPage = ({ onRegister, onNavigate }) => {
             <span style={{ fontSize: '13px', color: colors.textSecondary }}>Zaten bir hesabınız var mı? </span>
             <button
               type="button"
-              onClick={() => onNavigate('login')}
+              onClick={() => navigate('/login')}
               style={{
                 background: 'none',
                 border: 'none',

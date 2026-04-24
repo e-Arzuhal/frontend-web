@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { MainLayout } from './components/layout';
 import {
   DashboardPage,
@@ -17,13 +18,132 @@ import ChatbotWidget from './components/ChatbotWidget';
 import DisclaimerBanner from './components/DisclaimerBanner';
 import './styles/global.css';
 
+/* ─────────────────────────────────────────────────────────────
+   Router-aware page wrappers
+   Mevcut page component'leri onNavigate(page, data) callback'i ile
+   çalışıyor. Bu wrapper'lar react-router navigate() fonksiyonunu
+   onNavigate interface'ine çevirerek mevcut sayfalara müdahale
+   etmeden router entegrasyonu sağlar.
+   ───────────────────────────────────────────────────────────── */
+
+function NavigableCreateContract() {
+  const navigate = useNavigate();
+  const handleNavigate = (page, data) => {
+    if (page === 'contract-detail' && data?.contractId) {
+      navigate(`/contracts/${data.contractId}`);
+    } else {
+      navigate(pageToPath(page));
+    }
+  };
+  return <CreateContractPage onNavigate={handleNavigate} />;
+}
+
+function NavigableDashboard() {
+  const navigate = useNavigate();
+  const handleNavigate = (page, data) => {
+    if (page === 'contract-detail' && data?.contractId) {
+      navigate(`/contracts/${data.contractId}`);
+    } else {
+      navigate(pageToPath(page));
+    }
+  };
+  return <DashboardPage onNavigate={handleNavigate} />;
+}
+
+function NavigableContracts() {
+  const navigate = useNavigate();
+  const handleNavigate = (page, data) => {
+    if (page === 'contract-detail' && data?.contractId) {
+      navigate(`/contracts/${data.contractId}`);
+    } else {
+      navigate(pageToPath(page));
+    }
+  };
+  return <ContractsPage onNavigate={handleNavigate} />;
+}
+
+function NavigableApprovals() {
+  const navigate = useNavigate();
+  const handleNavigate = (page, data) => {
+    if (page === 'contract-detail' && data?.contractId) {
+      navigate(`/contracts/${data.contractId}`);
+    } else {
+      navigate(pageToPath(page));
+    }
+  };
+  return <ApprovalsPage onNavigate={handleNavigate} />;
+}
+
+function NavigableContractDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  return <ContractDetailPage contractId={Number(id)} onBack={() => navigate('/contracts')} />;
+}
+
+/** Sayfa adından URL path'e dönüşüm */
+function pageToPath(page) {
+  const map = {
+    'dashboard': '/',
+    'create': '/create',
+    'contracts': '/contracts',
+    'approvals': '/approvals',
+    'settings': '/settings',
+    'verification': '/verification',
+  };
+  return map[page] || '/';
+}
+
+/** URL path'inden sayfa adına dönüşüm (layout aktif tab için) */
+function pathToPage(pathname) {
+  if (pathname === '/') return 'dashboard';
+  if (pathname.startsWith('/contracts/')) return 'contracts';
+  const map = {
+    '/create': 'create',
+    '/contracts': 'contracts',
+    '/approvals': 'approvals',
+    '/settings': 'settings',
+    '/verification': 'verification',
+  };
+  return map[pathname] || 'dashboard';
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   Auth guard — kimliği doğrulanmamış kullanıcıları login'e yönlendirir
+   ───────────────────────────────────────────────────────────── */
+function ProtectedRoutes({ user, onLogout }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPage = pathToPage(location.pathname);
+
+  const handlePageChange = (page) => navigate(pageToPath(page));
+
+  return (
+    <MainLayout currentPage={currentPage} onPageChange={handlePageChange}>
+      <DisclaimerBanner onAccepted={() => { }} />
+      <Routes>
+        <Route path="/" element={<NavigableDashboard />} />
+        <Route path="/create" element={<NavigableCreateContract />} />
+        <Route path="/contracts" element={<NavigableContracts />} />
+        <Route path="/contracts/:id" element={<NavigableContractDetail />} />
+        <Route path="/approvals" element={<NavigableApprovals />} />
+        <Route path="/settings" element={<SettingsPage onLogout={onLogout} />} />
+        <Route path="/verification" element={<VerificationPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <ChatbotWidget />
+    </MainLayout>
+  );
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   App root
+   ───────────────────────────────────────────────────────────── */
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentPage, setCurrentPage] = useState('login');
   const [user, setUser] = useState(null);
-  const [selectedContractId, setSelectedContractId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
 
   // Check for existing authentication on component mount
   useEffect(() => {
@@ -39,7 +159,6 @@ function App() {
         const currentUser = authService.getCurrentUser();
         setUser(currentUser);
         setIsAuthenticated(true);
-        setCurrentPage('dashboard');
       } catch {
         // Süresi dolmuş veya geçersiz token → temizle, login'e yönlendir
         authService.logout();
@@ -54,27 +173,17 @@ function App() {
   const handleLogin = (userData) => {
     setUser(userData);
     setIsAuthenticated(true);
-    setCurrentPage('dashboard');
   };
 
   const handleRegister = (userData) => {
     setUser(userData);
     setIsAuthenticated(true);
-    setCurrentPage('dashboard');
   };
 
   const handleLogout = () => {
     authService.logout();
     setUser(null);
     setIsAuthenticated(false);
-    setCurrentPage('login');
-  };
-
-  const handleNavigate = (page, data) => {
-    if (page === 'contract-detail' && data?.contractId) {
-      setSelectedContractId(data.contractId);
-    }
-    setCurrentPage(page);
   };
 
   // Show loading spinner while checking authentication
@@ -103,42 +212,38 @@ function App() {
     );
   }
 
-  // Auth sayfalari (login/register)
-  if (!isAuthenticated) {
-    if (currentPage === 'register') {
-      return <RegisterPage onRegister={handleRegister} onNavigate={setCurrentPage} />;
-    }
-    return <LoginPage onLogin={handleLogin} onNavigate={setCurrentPage} />;
-  }
-
-  // Ana uygulama sayfalari
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <DashboardPage onNavigate={handleNavigate} />;
-      case 'create':
-        return <CreateContractPage onNavigate={handleNavigate} />;
-      case 'contracts':
-        return <ContractsPage onNavigate={handleNavigate} />;
-      case 'approvals':
-        return <ApprovalsPage onNavigate={handleNavigate} />;
-      case 'settings':
-        return <SettingsPage onLogout={handleLogout} />;
-      case 'contract-detail':
-        return <ContractDetailPage contractId={selectedContractId} onBack={() => setCurrentPage('contracts')} />;
-      case 'verification':
-        return <VerificationPage />;
-      default:
-        return <DashboardPage onNavigate={handleNavigate} />;
-    }
-  };
-
   return (
-    <MainLayout currentPage={currentPage} onPageChange={setCurrentPage}>
-      <DisclaimerBanner onAccepted={() => setDisclaimerAccepted(true)} />
-      {renderPage()}
-      {isAuthenticated && <ChatbotWidget />}
-    </MainLayout>
+    <BrowserRouter>
+      <Routes>
+        {/* Auth sayfaları — kimlik doğrulaması gerekmez */}
+        <Route
+          path="/login"
+          element={
+            isAuthenticated
+              ? <Navigate to="/" replace />
+              : <LoginPage onLogin={handleLogin} onNavigate={(page) => {/* handled by router */ }} />
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            isAuthenticated
+              ? <Navigate to="/" replace />
+              : <RegisterPage onRegister={handleRegister} onNavigate={(page) => {/* handled by router */ }} />
+          }
+        />
+
+        {/* Korunan sayfalar */}
+        <Route
+          path="/*"
+          element={
+            isAuthenticated
+              ? <ProtectedRoutes user={user} onLogout={handleLogout} />
+              : <Navigate to="/login" replace />
+          }
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
