@@ -7,16 +7,17 @@ class ApiService {
   }
 
   async request(endpoint, options = {}) {
+    const { timeoutMs, ...fetchOptions } = options;
     const url = `${this.baseUrl}${endpoint}`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs ?? this.timeout);
 
-    const headers = { 'Content-Type': 'application/json', ...options.headers };
+    const headers = { 'Content-Type': 'application/json', ...fetchOptions.headers };
     const token = localStorage.getItem('authToken');
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     try {
-      const response = await fetch(url, { ...options, headers, signal: controller.signal });
+      const response = await fetch(url, { ...fetchOptions, headers, signal: controller.signal });
       clearTimeout(timeoutId);
       if (response.status === 401) {
         localStorage.removeItem('authToken');
@@ -35,25 +36,25 @@ class ApiService {
     }
   }
 
-  get(endpoint, params = {}) {
+  get(endpoint, params = {}, opts = {}) {
     const query = new URLSearchParams(params).toString();
-    return this.request(query ? `${endpoint}?${query}` : endpoint, { method: 'GET' });
+    return this.request(query ? `${endpoint}?${query}` : endpoint, { method: 'GET', ...opts });
   }
 
-  post(endpoint, data = {}) {
-    return this.request(endpoint, { method: 'POST', body: JSON.stringify(data) });
+  post(endpoint, data = {}, opts = {}) {
+    return this.request(endpoint, { method: 'POST', body: JSON.stringify(data), ...opts });
   }
 
-  put(endpoint, data = {}) {
-    return this.request(endpoint, { method: 'PUT', body: JSON.stringify(data) });
+  put(endpoint, data = {}, opts = {}) {
+    return this.request(endpoint, { method: 'PUT', body: JSON.stringify(data), ...opts });
   }
 
-  patch(endpoint, data = {}) {
-    return this.request(endpoint, { method: 'PATCH', body: JSON.stringify(data) });
+  patch(endpoint, data = {}, opts = {}) {
+    return this.request(endpoint, { method: 'PATCH', body: JSON.stringify(data), ...opts });
   }
 
-  delete(endpoint) {
-    return this.request(endpoint, { method: 'DELETE' });
+  delete(endpoint, opts = {}) {
+    return this.request(endpoint, { method: 'DELETE', ...opts });
   }
 
   async getBlob(endpoint) {
