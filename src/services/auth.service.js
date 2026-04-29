@@ -106,6 +106,35 @@ class AuthService {
   getToken() {
     return localStorage.getItem('authToken');
   }
+
+  /**
+   * Şifre sıfırlama bağlantısı talep eder. Backend her zaman 200 döner
+   * (e-posta var/yok bilgisi sızdırılmaz).
+   */
+  async requestPasswordReset(email) {
+    return api.post('/api/auth/forgot-password', { email });
+  }
+
+  /**
+   * Şifre sıfırlama tokenı ile yeni şifre belirler.
+   */
+  async resetPassword(token, newPassword) {
+    return api.post('/api/auth/reset-password', { token, newPassword });
+  }
+
+  /**
+   * 2FA kodunu e-posta ile gönderme talebi.
+   */
+  async send2faCode() {
+    return api.post('/api/auth/2fa/send');
+  }
+
+  /**
+   * 2FA kodunu doğrula ve etkinleştir/deaktive et.
+   */
+  async verify2faCode(code, action = 'enable') {
+    return api.post('/api/auth/2fa/verify', { code, action });
+  }
 }
 
 const authService = new AuthService();

@@ -5,3 +5,7 @@ export { default as Input } from './Input';
 export { default as TextArea } from './TextArea';
 export { default as ProgressBar } from './ProgressBar';
 export { default as StepIndicator } from './StepIndicator';
+export { default as ConfirmDialog } from './ConfirmDialog';
+export { default as LegalModal } from './LegalModal';
+export { default as ForgotPasswordModal } from './ForgotPasswordModal';
+export { default as TwoFactorModal } from './TwoFactorModal';
