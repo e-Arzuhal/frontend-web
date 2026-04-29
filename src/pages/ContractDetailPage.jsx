@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { TopBar } from '../components/layout';
-import { Card, Button, Badge, ProgressBar } from '../components/ui';
+import { Card, Button, Badge, ProgressBar, ConfirmDialog } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
 import contractService from '../services/contract.service';
+
+const friendlyError = (err) => {
+  const raw = err?.response?.data?.message || err?.message || '';
+  if (!raw) return 'Beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
+  if (/timeout|zaman aşımı|abort/i.test(raw)) return 'İşlem zaman aşımına uğradı. Lütfen tekrar deneyin.';
+  if (/failed to fetch|networkerror/i.test(raw)) return 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.';
+  if (/HTTP 4\d{2}|HTTP 5\d{2}/.test(raw)) return 'İşlem tamamlanamadı. Lütfen tekrar deneyin.';
+  // backend'in Türkçe ürettiği mesajları olduğu gibi göster, tekniği gizle
+  return raw;
+};
 
 const DownloadIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
@@ -107,9 +117,19 @@ const PdfConfirmModal = ({ data, onConfirm, onCancel, isDownloading }) => {
             <div style={{ fontSize: '13px', fontWeight: 600, color: '#7a6535', marginBottom: '6px' }}>
               ⚠️ Uyarılar
             </div>
-            {data.warnings.map((w, i) => (
-              <div key={i} style={{ fontSize: '12px', color: '#7a6535', lineHeight: 1.5 }}>• {w}</div>
-            ))}
+            {data.warnings.map((w, i) => {
+              // Teknik ifadeleri kullanıcı diline çevir
+              const friendly = w
+                .replace(/—\s*NLP[^.]+\./, '— Tutar bilgisi metinden çıkarılamadı.')
+                .replace(/parse hatası olmuş olabilir\./, 'lütfen sözleşme metnini gözden geçirin.')
+                .replace(/dijital onay akışı çalışmaz/, 'karşı tarafa onay için iletilemez');
+              return (
+                <div key={i} style={{ fontSize: '12px', color: '#7a6535', lineHeight: 1.5 }}>• {friendly}</div>
+              );
+            })}
+            <p style={{ fontSize: '11px', color: '#7a6535', marginTop: '8px', lineHeight: 1.5 }}>
+              Eksik alanları sözleşme detay sayfasından düzenleyebilirsiniz (tutar başlığına tıklayın).
+            </p>
           </div>
         )}
 
@@ -143,6 +163,13 @@ const ContractDetailPage = ({ contractId, onBack }) => {
   const [pdfConfirmData, setPdfConfirmData] = useState(null);
   const [isPdfConfirmLoading, setIsPdfConfirmLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [editingAmount, setEditingAmount] = useState(false);
+  const [amountDraft, setAmountDraft] = useState('');
+  const [savingAmount, setSavingAmount] = useState(false);
 
   useEffect(() => {
     const fetchContract = async () => {
@@ -155,7 +182,7 @@ const ContractDetailPage = ({ contractId, onBack }) => {
         const data = await contractService.getById(contractId);
         setContract(data);
       } catch (err) {
-        setError(err.message || 'Sözleşme yüklenirken hata oluştu.');
+        setError(friendlyError(err) || 'Sözleşme yüklenirken hata oluştu.');
       } finally {
         setLoading(false);
       }
@@ -179,7 +206,7 @@ const ContractDetailPage = ({ contractId, onBack }) => {
       const data = await contractService.getPdfConfirm(contract.id);
       setPdfConfirmData(data);
     } catch (err) {
-      setActionError('PDF hazırlanırken hata oluştu. Lütfen tekrar deneyin.');
+      setActionError(friendlyError(err) || 'PDF hazırlanırken hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setIsPdfConfirmLoading(false);
     }
@@ -198,9 +225,53 @@ const ContractDetailPage = ({ contractId, onBack }) => {
       URL.revokeObjectURL(url);
       setPdfConfirmData(null);
     } catch (err) {
-      setActionError('PDF indirilirken hata oluştu. Lütfen tekrar deneyin.');
+      setActionError(friendlyError(err) || 'PDF indirilirken hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setIsPdfDownloading(false);
+    }
+  };
+
+  const handleSaveAmount = async () => {
+    setSavingAmount(true);
+    setActionError(null);
+    try {
+      const updated = await contractService.update(contract.id, { amount: amountDraft });
+      setContract(updated);
+      setEditingAmount(false);
+    } catch (err) {
+      setActionError(friendlyError(err) || 'Tutar güncellenemedi.');
+    } finally {
+      setSavingAmount(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true);
+    setActionError(null);
+    try {
+      await contractService.delete(contract.id);
+      setShowDeleteConfirm(false);
+      onBack();
+    } catch (err) {
+      setActionError(friendlyError(err) || 'Sözleşme silinemedi.');
+      setShowDeleteConfirm(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleConfirmFinalize = async () => {
+    setIsFinalizing(true);
+    setActionError(null);
+    try {
+      const updated = await contractService.finalize(contract.id);
+      setContract(updated);
+      setShowFinalizeConfirm(false);
+    } catch (err) {
+      setActionError(friendlyError(err) || 'Onaya gönderme başarısız.');
+      setShowFinalizeConfirm(false);
+    } finally {
+      setIsFinalizing(false);
     }
   };
 
@@ -228,7 +299,23 @@ const ContractDetailPage = ({ contractId, onBack }) => {
   }
 
   const isApproved = contract.status === 'APPROVED' || contract.status === 'COMPLETED';
+  const isRejected = contract.status === 'REJECTED';
+  const isFinalized = isApproved || isRejected;
   const approvalProgress = isApproved ? 1 : 0;
+  // viewerIsOwner backend tarafından doldurulur — eski response'larda olmayabilir,
+  // bu durumda fallback olarak username eşleşmesine bakarız (localStorage user).
+  let isOwner = contract.viewerIsOwner;
+  if (isOwner === undefined || isOwner === null) {
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || '{}');
+      isOwner = u?.username && contract.ownerUsername === u.username;
+    } catch {
+      isOwner = true;
+    }
+  }
+  const canEditAmount = isOwner && !isFinalized;
+  const canDelete = isOwner && !isApproved;
+  const canFinalize = isOwner && contract.status === 'DRAFT';
 
   return (
     <div style={{ animation: 'fadeInUp 0.4s ease' }}>
@@ -240,6 +327,28 @@ const ContractDetailPage = ({ contractId, onBack }) => {
           isDownloading={isPdfDownloading}
         />
       )}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Sözleşmeyi Sil"
+        message="Bu sözleşmeyi kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
+        confirmLabel="Evet, Sil"
+        cancelLabel="Vazgeç"
+        variant="danger"
+        loading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+      <ConfirmDialog
+        open={showFinalizeConfirm}
+        title="Onaya Gönder"
+        message="Sözleşme karşı tarafa onay için iletilecek. Devam etmek istiyor musunuz?"
+        confirmLabel="Evet, Gönder"
+        cancelLabel="Vazgeç"
+        variant="accent"
+        loading={isFinalizing}
+        onConfirm={handleConfirmFinalize}
+        onCancel={() => setShowFinalizeConfirm(false)}
+      />
       <TopBar
         title={contract.title}
         subtitle={`Oluşturulma: ${formatDate(contract.createdAt)}`}
@@ -261,10 +370,48 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                   <Badge variant={statusConfig[contract.status]?.variant || 'default'} style={{ marginBottom: '12px' }}>
                     {statusConfig[contract.status]?.label || contract.status}
                   </Badge>
-                  <h2 style={{ fontFamily: fonts.heading, fontSize: '28px', fontWeight: 600, marginBottom: '4px' }}>
-                    {contract.amount || '-'}
-                  </h2>
-                  <p style={{ fontSize: '14px', color: colors.textSecondary }}>Sözleşme Tutarı</p>
+                  {editingAmount ? (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
+                      <input
+                        type="text"
+                        value={amountDraft}
+                        autoFocus
+                        onChange={(e) => setAmountDraft(e.target.value)}
+                        placeholder="örn. 5000 TL"
+                        style={{
+                          fontFamily: fonts.heading, fontSize: '24px', fontWeight: 600,
+                          padding: '4px 10px', background: colors.surfaceAlt,
+                          border: `1px solid ${colors.border}`, borderRadius: radius.md,
+                          color: colors.text, width: '180px',
+                        }}
+                      />
+                      <Button variant="accent" onClick={handleSaveAmount} loading={savingAmount}>
+                        Kaydet
+                      </Button>
+                      <Button variant="ghost" onClick={() => { setEditingAmount(false); setAmountDraft(''); }}>
+                        Vazgeç
+                      </Button>
+                    </div>
+                  ) : (
+                    <h2
+                      style={{
+                        fontFamily: fonts.heading, fontSize: '28px', fontWeight: 600,
+                        marginBottom: '4px',
+                        cursor: canEditAmount ? 'pointer' : 'default',
+                      }}
+                      title={canEditAmount ? 'Tutarı düzenlemek için tıklayın' : undefined}
+                      onClick={() => {
+                        if (!canEditAmount) return;
+                        setAmountDraft(contract.amount || '');
+                        setEditingAmount(true);
+                      }}
+                    >
+                      {contract.amount || (canEditAmount ? 'Tutar girin' : '-')}
+                    </h2>
+                  )}
+                  <p style={{ fontSize: '14px', color: colors.textSecondary }}>
+                    Sözleşme Tutarı{canEditAmount && !editingAmount ? ' · düzenlemek için tıklayın' : ''}
+                  </p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '13px', color: colors.textMuted, marginBottom: '4px' }}>Sözleşme No</div>
@@ -395,7 +542,18 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                 </div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {contract.status === 'DRAFT' && (
+                {!isOwner && (
+                  <div style={{
+                    padding: '10px 12px',
+                    background: 'rgba(56, 132, 255, 0.1)',
+                    border: '1px solid rgba(56, 132, 255, 0.35)',
+                    borderRadius: '8px', fontSize: '12px', color: '#1a4a99',
+                    lineHeight: 1.5,
+                  }}>
+                    Bu sözleşmeyi görüntülüyorsunuz. Onay/ret işlemleri için "Onay Bekleyenler" sayfasını kullanın.
+                  </div>
+                )}
+                {canFinalize && (
                   <>
                     <div style={{
                       padding: '10px 12px', marginBottom: '4px',
@@ -406,15 +564,7 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                     }}>
                       ⚠️ Onaya göndermeden önce sözleşmeyi bir avukata inceletmenizi öneririz.
                     </div>
-                    <Button variant="accent" fullWidth onClick={async () => {
-                      setActionError(null);
-                      try {
-                        const updated = await contractService.finalize(contract.id);
-                        setContract(updated);
-                      } catch (err) {
-                        setActionError(err?.response?.data?.message || err.message || 'Onaya gönderme başarısız.');
-                      }
-                    }}>
+                    <Button variant="accent" fullWidth onClick={() => setShowFinalizeConfirm(true)}>
                       Onaya Gönder
                     </Button>
                   </>
@@ -425,17 +575,21 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                   </span>
                 </Button>
                 <Button variant="outline" fullWidth onClick={onBack}>Sözleşmelere Dön</Button>
-                <Button variant="ghost" fullWidth style={{ color: colors.error }} onClick={async () => {
-                  setActionError(null);
-                  try {
-                    await contractService.delete(contract.id);
-                    onBack();
-                  } catch (err) {
-                    setActionError(err?.response?.data?.message || err.message || 'Sözleşme silinemedi.');
-                  }
-                }}>
-                  Sözleşmeyi Sil
-                </Button>
+                {canDelete && (
+                  <Button
+                    variant="ghost"
+                    fullWidth
+                    style={{ color: colors.error }}
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    Sözleşmeyi Sil
+                  </Button>
+                )}
+                {isOwner && isApproved && (
+                  <p style={{ fontSize: '11px', color: colors.textMuted, lineHeight: 1.5, margin: 0 }}>
+                    Onaylanmış sözleşmeler yasal kayıt gereği silinemez.
+                  </p>
+                )}
               </div>
             </Card>
           </div>

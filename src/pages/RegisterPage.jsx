@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Input } from '../components/ui';
+import { Card, Button, Input, LegalModal } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
 import authService from '../services/auth.service';
 
@@ -55,6 +55,7 @@ const RegisterPage = ({ onRegister }) => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [legalModal, setLegalModal] = useState(null);
 
   const handleChange = (field) => (e) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
@@ -109,7 +110,13 @@ const RegisterPage = ({ onRegister }) => {
 
       onRegister(response.userInfo);
     } catch (err) {
-      setErrors({ general: err.message || 'Kayıt başarısız. Lütfen tekrar deneyin.' });
+      const raw = err?.message || '';
+      let msg = 'Kayıt başarısız. Lütfen tekrar deneyin.';
+      if (/already exists|already in use|kayıtlı/i.test(raw)) msg = 'Bu e-posta veya kullanıcı adı zaten kayıtlı.';
+      else if (/failed to fetch|networkerror/i.test(raw)) msg = 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.';
+      else if (/HTTP 5\d{2}/.test(raw)) msg = 'Sunucuda geçici bir sorun oluştu. Lütfen daha sonra tekrar deneyin.';
+      else if (raw) msg = raw;
+      setErrors({ general: msg });
     } finally {
       setIsLoading(false);
     }
@@ -266,8 +273,19 @@ const RegisterPage = ({ onRegister }) => {
                   )}
                 </div>
                 <span style={{ fontSize: '12px', color: colors.textSecondary, lineHeight: 1.55 }}>
-                  <span style={{ color: colors.accent, cursor: 'pointer', fontWeight: 600 }}>Kullanım Koşulları</span> ve{' '}
-                  <span style={{ color: colors.accent, cursor: 'pointer', fontWeight: 600 }}>Gizlilik Politikası</span>'nı okudum, kabul ediyorum.
+                  <span
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalModal('terms'); }}
+                    style={{ color: colors.accent, cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}
+                  >
+                    Kullanım Koşulları
+                  </span>{' '}ve{' '}
+                  <span
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalModal('privacy'); }}
+                    style={{ color: colors.accent, cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}
+                  >
+                    Gizlilik Politikası
+                  </span>
+                  'nı okudum, kabul ediyorum.
                 </span>
               </label>
               {errors.terms && (
@@ -328,18 +346,19 @@ const RegisterPage = ({ onRegister }) => {
         <div style={{ textAlign: 'center', marginTop: '18px', color: 'rgba(255,255,255,0.55)', fontSize: '12px' }}>
           <div style={{ marginBottom: '6px' }}>© 2026 e-Arzuhal. Tüm hakları saklıdır.</div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => {}} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
+            <button type="button" onClick={() => setLegalModal('kvkk')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
               KVKK
             </button>
-            <button type="button" onClick={() => {}} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
+            <button type="button" onClick={() => setLegalModal('terms')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
               Kullanım
             </button>
-            <button type="button" onClick={() => {}} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
+            <button type="button" onClick={() => setLegalModal('support')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
               Destek
             </button>
           </div>
         </div>
       </div>
+      <LegalModal open={!!legalModal} type={legalModal} onClose={() => setLegalModal(null)} />
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { Card, Button, Badge, TextArea, StepIndicator } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
 import contractService from '../services/contract.service';
 import useVoiceInput from '../hooks/useVoiceInput';
+import { labelForClause, placeholderForClause } from '../utils/clauseLabels';
 
 const STEPS = ['Metin Girişi', 'Sözleşme Önerisi', 'PDF Önizleme', 'Onay & İmza'];
 
@@ -152,24 +153,25 @@ const CreateContractPage = ({ onNavigate }) => {
         entityList.push({ label: i === 0 ? 'Karşı Taraf' : 'Taraf', type: 'PERSON', value: t })
       );
 
+      const normalizeClause = (f) => {
+        const id = typeof f === 'string' ? f : (f.field_name || f.id || f.name || String(f));
+        return {
+          id,
+          name: labelForClause(f) || labelForClause(id),
+          description: typeof f === 'object' ? (f.description || '') : '',
+        };
+      };
+
       setAnalysisResult({
         contractType: realResult.contract_type_display?.replace(/_/g, ' ') || realResult.contract_type,
         contractTypeEn: realResult.contract_type,
         confidence: realResult.confidence || 0,
         entities: entityList,
-        mandatoryClauses: matched.map(f => ({
-          id: f.field_name || f,
-          name: f.name || f.field_name || String(f),
-          description: f.description || '',
-        })),
-        missingClauses: missing.map(f => ({
-          id: typeof f === 'string' ? f : (f.field_name || f.name || String(f)),
-          name: typeof f === 'string' ? f : (f.name || f.field_name || String(f)),
-          description: typeof f === 'object' ? (f.description || '') : '',
-        })),
+        mandatoryClauses: matched.map(normalizeClause),
+        missingClauses: missing.map(normalizeClause),
         suggestedClauses: graphSuggestions.map(s => ({
           id: s.field_name,
-          name: s.field_name,
+          name: labelForClause(s.field_name),
           description: s.message || '',
           usagePercent: s.usage_percent ?? null,
           recommended: s.necessity === 'required' || s.necessity === 'recommended',
@@ -178,7 +180,13 @@ const CreateContractPage = ({ onNavigate }) => {
       setMissingFieldValues({});
       setCurrentStep(1);
     } catch (e) {
-      alert('Analiz başarısız: ' + (e.message || 'Sunucuya bağlanılamadı.'));
+      const raw = e?.message || '';
+      const friendly = /timeout|zaman aşımı|abort/i.test(raw)
+        ? 'Analiz uzun sürdü. Lütfen biraz sonra tekrar deneyin.'
+        : /failed to fetch|networkerror/i.test(raw)
+        ? 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.'
+        : 'Metniniz analiz edilemedi. Lütfen daha açıklayıcı bir metinle tekrar deneyin.';
+      alert(friendly);
     } finally {
       setIsAnalyzing(false);
     }
@@ -197,7 +205,9 @@ const CreateContractPage = ({ onNavigate }) => {
     const missingClauses = analysisResult?.missingClauses || [];
     const filledMissing = missingClauses.filter(c => missingFieldValues[c.id]?.trim());
     if (filledMissing.length > 0) {
-      const additions = filledMissing.map(c => `\n\n[${c.name}]: ${missingFieldValues[c.id].trim()}`).join('');
+      const additions = filledMissing
+        .map(c => `\n\n${labelForClause(c.id) || c.name}: ${missingFieldValues[c.id].trim()}`)
+        .join('');
       content += '\n\n--- Eksik Maddeler ---' + additions;
     }
 
@@ -205,7 +215,9 @@ const CreateContractPage = ({ onNavigate }) => {
     const suggestions = analysisResult?.suggestedClauses || [];
     const selected = suggestions.filter(s => selectedClauses.includes(s.id));
     if (selected.length > 0) {
-      const additions = selected.map(s => `\n\n[${s.name}]: ${s.description}`).join('');
+      const additions = selected
+        .map(s => `\n\n${labelForClause(s.id) || s.name}: ${s.description}`)
+        .join('');
       content += '\n\n--- Ek Maddeler ---' + additions;
     }
 
@@ -456,7 +468,7 @@ const CreateContractPage = ({ onNavigate }) => {
                   </label>
                   <input
                     type="text"
-                    placeholder={clause.description || `${clause.name} bilgisini girin`}
+                    placeholder={placeholderForClause(clause.id) || clause.description || `${clause.name} bilgisini girin`}
                     value={missingFieldValues[clause.id] || ''}
                     onChange={e => setMissingFieldValues(prev => ({ ...prev, [clause.id]: e.target.value }))}
                     style={{

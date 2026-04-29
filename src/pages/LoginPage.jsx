@@ -5,9 +5,22 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Input } from '../components/ui';
+import { Card, Button, Input, LegalModal, ForgotPasswordModal } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
 import authService from '../services/auth.service';
+
+const friendlyAuthError = (raw) => {
+  const m = (raw || '').toString();
+  if (!m) return 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.';
+  if (/invalid username or password/i.test(m)) return 'Kullanıcı adı veya şifre hatalı.';
+  if (/bad credentials/i.test(m)) return 'Kullanıcı adı veya şifre hatalı.';
+  if (/user.*not.*found/i.test(m)) return 'Bu e-posta ile kayıtlı bir hesap bulunamadı.';
+  if (/account.*lock|too many attempts/i.test(m)) return 'Çok fazla başarısız deneme. Lütfen biraz sonra tekrar deneyin.';
+  if (/timeout|zaman aşımı|abort/i.test(m)) return 'İşlem zaman aşımına uğradı. Lütfen tekrar deneyin.';
+  if (/failed to fetch|networkerror/i.test(m)) return 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.';
+  if (/HTTP 5\d{2}/.test(m)) return 'Sunucuda geçici bir sorun oluştu. Lütfen daha sonra tekrar deneyin.';
+  return m;
+};
 
 const EmailIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
@@ -29,6 +42,8 @@ const LoginPage = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [legalModal, setLegalModal] = useState(null);
+  const [showForgot, setShowForgot] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,7 +60,7 @@ const LoginPage = ({ onLogin }) => {
       const response = await authService.login(email, password);
       onLogin(response.userInfo);
     } catch (err) {
-      setError(err.message || 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
+      setError(friendlyAuthError(err.message));
     } finally {
       setIsLoading(false);
     }
@@ -62,6 +77,14 @@ const LoginPage = ({ onLogin }) => {
     }}>
       <div style={{ width: '100%', maxWidth: '420px', animation: 'fadeInUp 0.45s ease' }}>
         <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+          <img
+            src={`${process.env.PUBLIC_URL || ''}/e-Arzuhal-logo.png`}
+            alt="e-Arzuhal"
+            width={72}
+            height={72}
+            style={{ borderRadius: '16px', objectFit: 'contain', marginBottom: '10px', background: 'rgba(255,255,255,0.08)' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
           <h1 style={{ fontFamily: fonts.heading, fontSize: '36px', fontWeight: 700, color: '#fff', marginBottom: '6px' }}>
             e-Arzuhal
           </h1>
@@ -145,7 +168,7 @@ const LoginPage = ({ onLogin }) => {
             <div style={{ textAlign: 'center' }}>
               <button
                 type="button"
-                onClick={() => {}}
+                onClick={() => setShowForgot(true)}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -192,18 +215,20 @@ const LoginPage = ({ onLogin }) => {
         <div style={{ textAlign: 'center', marginTop: '18px', color: 'rgba(255,255,255,0.55)', fontSize: '12px' }}>
           <div style={{ marginBottom: '6px' }}>© 2026 e-Arzuhal. Tüm hakları saklıdır.</div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => {}} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
+            <button type="button" onClick={() => setLegalModal('kvkk')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
               KVKK
             </button>
-            <button type="button" onClick={() => {}} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
+            <button type="button" onClick={() => setLegalModal('terms')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
               Kullanım Koşulları
             </button>
-            <button type="button" onClick={() => {}} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
+            <button type="button" onClick={() => setLegalModal('support')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: '12px', fontFamily: fonts.body }}>
               Destek
             </button>
           </div>
         </div>
       </div>
+      <LegalModal open={!!legalModal} type={legalModal} onClose={() => setLegalModal(null)} />
+      <ForgotPasswordModal open={showForgot} onClose={() => setShowForgot(false)} />
     </div>
   );
 };
