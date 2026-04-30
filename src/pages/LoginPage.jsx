@@ -41,24 +41,58 @@ const LoginPage = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [legalModal, setLegalModal] = useState(null);
   const [showForgot, setShowForgot] = useState(false);
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setInfo('');
 
     if (!email || !password) {
       setError('Lütfen tüm alanları doldurun.');
+      return;
+    }
+    if (twoFactorRequired && (!twoFactorCode || twoFactorCode.length < 4)) {
+      setError('Lütfen e-postanıza gelen 6 haneli kodu girin.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const response = await authService.login(email, password);
+      const response = await authService.login(
+        email,
+        password,
+        twoFactorRequired ? twoFactorCode : undefined,
+      );
+      if (response?.requires2fa && !response.accessToken) {
+        setTwoFactorRequired(true);
+        setTwoFactorCode('');
+        setInfo('E-postanıza 6 haneli bir doğrulama kodu gönderildi. Lütfen kodu girerek girişi tamamlayın.');
+        return;
+      }
       onLogin(response.userInfo);
+    } catch (err) {
+      setError(friendlyAuthError(err.message));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setError('');
+    setInfo('');
+    setIsLoading(true);
+    try {
+      const response = await authService.login(email, password);
+      if (response?.requires2fa) {
+        setInfo('Yeni bir kod e-posta adresinize gönderildi.');
+      }
     } catch (err) {
       setError(friendlyAuthError(err.message));
     } finally {
@@ -124,6 +158,7 @@ const LoginPage = ({ onLogin }) => {
                 onChange={(e) => setEmail(e.target.value)}
                 icon={<EmailIcon />}
                 required
+                disabled={twoFactorRequired}
               />
             </div>
 
@@ -138,8 +173,61 @@ const LoginPage = ({ onLogin }) => {
                 onChange={(e) => setPassword(e.target.value)}
                 icon={<LockIcon />}
                 required
+                disabled={twoFactorRequired}
               />
             </div>
+
+            {twoFactorRequired && (
+              <div style={{ marginBottom: '14px' }}>
+                <Input
+                  label="Doğrulama Kodu"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="6 haneli kod"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  required
+                />
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setTwoFactorRequired(false); setTwoFactorCode(''); setInfo(''); setError(''); }}
+                    style={{
+                      background: 'none', border: 'none', color: colors.accent,
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: fonts.body, padding: 0,
+                    }}
+                  >
+                    ← E-posta veya şifreyi değiştir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResendCode}
+                    disabled={isLoading}
+                    style={{
+                      background: 'none', border: 'none', color: colors.accent,
+                      fontSize: 12, fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer',
+                      fontFamily: fonts.body, padding: 0,
+                    }}
+                  >
+                    Kodu yeniden gönder
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {info && (
+              <div style={{
+                padding: '12px 14px',
+                background: colors.successBg,
+                color: colors.success,
+                borderRadius: radius.md,
+                fontSize: '13px',
+                marginBottom: '14px',
+              }}>
+                {info}
+              </div>
+            )}
 
             {error && (
               <div style={{
@@ -162,7 +250,7 @@ const LoginPage = ({ onLogin }) => {
               loading={isLoading}
               style={{ marginBottom: '12px', boxShadow: '0 10px 18px rgba(15, 26, 48, 0.18)' }}
             >
-              Giriş Yap
+              {twoFactorRequired ? 'Doğrula ve Giriş Yap' : 'Giriş Yap'}
             </Button>
 
             <div style={{ textAlign: 'center' }}>
@@ -206,7 +294,7 @@ const LoginPage = ({ onLogin }) => {
                   padding: 0,
                 }}
               >
-                Kayıt Olun
+                Kaydolun
               </button>
             </div>
           </form>

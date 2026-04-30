@@ -61,7 +61,6 @@ const VerificationPage = () => {
   const [showNfcModal, setShowNfcModal] = useState(false);
   const [form, setForm] = useState({ tcNo: '', firstName: '', lastName: '', dateOfBirth: '' });
   const [tcError, setTcError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
 
@@ -126,37 +125,24 @@ const VerificationPage = () => {
     }
   };
 
-  /* Manuel form gönder */
+  /* Manuel form gönder — web'de yalnızca bilgi alınır; doğrulama mobil NFC ile yapılır. */
   const handleSubmit = async () => {
     if (!isValidTcNo(form.tcNo)) { setTcError('Geçersiz TC Kimlik Numarası.'); return; }
     if (!form.firstName.trim() || !form.lastName.trim()) {
       setSubmitError('Ad ve soyad zorunludur.'); return;
     }
-    setIsSubmitting(true);
     setSubmitError('');
-    try {
-      const result = await verificationService.verify({
-        tcNo: form.tcNo,
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        dateOfBirth: form.dateOfBirth || null,
-        method: 'MANUAL',
-      });
-      setVerificationStatus(result);
-    } catch (err) {
-      setSubmitError(err.message || 'Doğrulama sırasında hata oluştu.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    setShowNfcModal(true);
   };
 
-  /* Kamera ile tarama simülasyonu (MRZ OCR backend'e bağlandığında gerçeğe dönecek) */
+  /* Kamera ile tarama: MRZ okunsa bile web üzerinde doğrulama tamamlanamaz —
+     kullanıcı NFC için mobil uygulamaya yönlendirilir. */
   const handleCameraCapture = () => {
     setIsCapturing(true);
     setTimeout(() => {
       setIsCapturing(false);
-      setCameraError('Kimlik kartı tanınamadı. Lütfen kartı düzgün konumlandırın veya Manuel Giriş yöntemini kullanın.');
-    }, 2000);
+      setShowNfcModal(true);
+    }, 800);
   };
 
   /* ─────────────── Durum kartı ─────────────── */
@@ -305,6 +291,16 @@ const VerificationPage = () => {
       )}
 
       <div style={{
+        padding: '12px 16px', background: 'rgba(200,150,62,0.08)',
+        border: `1px solid rgba(200,150,62,0.30)`,
+        borderRadius: radius.md, fontSize: '13px', color: colors.text,
+        marginBottom: '12px', lineHeight: 1.6,
+      }}>
+        <strong>Bilgilendirme:</strong> Web üzerinden kimlik doğrulaması tamamlanamaz. Bilgileriniz alındıktan sonra,
+        kimlik doğrulaması için <strong>e-Arzuhal mobil uygulamasıyla NFC tarama</strong> yapmanız gerekir.
+      </div>
+
+      <div style={{
         padding: '12px 16px', background: colors.surfaceAlt,
         borderRadius: radius.md, fontSize: '12px', color: colors.textMuted,
         marginBottom: '20px', lineHeight: 1.6,
@@ -313,14 +309,34 @@ const VerificationPage = () => {
         Hiçbir zaman açık metin olarak depolanmaz.
       </div>
 
+      <button
+        onClick={() => setShowNfcModal(true)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '14px', width: '100%',
+          padding: '14px 16px', background: 'rgba(200,150,62,0.07)',
+          border: `1px solid rgba(200,150,62,0.30)`, borderRadius: radius.md,
+          marginBottom: '16px', cursor: 'pointer', textAlign: 'left',
+        }}
+      >
+        <span style={{ color: colors.accent, flexShrink: 0 }}><NfcIcon size={24} /></span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: colors.text, marginBottom: '2px' }}>
+            NFC ile Kimlik Doğrulama
+          </div>
+          <div style={{ fontSize: '12px', color: colors.textSecondary }}>
+            Mobil uygulama gereklidir — detaylar için tıklayın
+          </div>
+        </div>
+        <span style={{ color: colors.textMuted, fontSize: '18px' }}>›</span>
+      </button>
+
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Button
           variant="accent"
           onClick={handleSubmit}
-          loading={isSubmitting}
           disabled={form.tcNo.length !== 11 || !!tcError || !form.firstName.trim() || !form.lastName.trim()}
         >
-          {isSubmitting ? 'Doğrulanıyor...' : 'Kimliği Doğrula'}
+          Devam Et
         </Button>
       </div>
     </Card>

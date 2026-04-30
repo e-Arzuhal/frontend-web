@@ -81,6 +81,9 @@ const SettingsPage = ({ onLogout }) => {
         phone: '',
         company: '',
       });
+      if (typeof currentUser.twoFactorEnabled === 'boolean') {
+        setTwoFactorEnabled(currentUser.twoFactorEnabled);
+      }
     }
   }, []);
 

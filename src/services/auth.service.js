@@ -40,19 +40,24 @@ class AuthService {
   }
 
   /**
-   * Login user
+   * Login user. Eğer kullanıcı 2FA açıksa ilk istek {@code accessToken=null} ve
+   * {@code requires2fa=true} döner; istemci kullanıcıdan kodu alıp aynı çağrıyı
+   * {@code twoFactorCode} ile tekrar yapmalıdır.
+   *
    * @param {string} usernameOrEmail - Username or email
    * @param {string} password - Password
+   * @param {string} [twoFactorCode] - 2FA kodu (varsa)
    * @returns {Promise<Object>} Authentication response with token and user info
    */
-  async login(usernameOrEmail, password) {
+  async login(usernameOrEmail, password, twoFactorCode) {
     try {
       const response = await api.post('/api/auth/login', {
         usernameOrEmail,
         password,
+        twoFactorCode: twoFactorCode || null,
       });
 
-      // Save token to localStorage
+      // Save token to localStorage (sadece gerçek bir token varsa)
       if (response.accessToken) {
         localStorage.setItem('authToken', response.accessToken);
         localStorage.setItem('user', JSON.stringify(response.userInfo));
@@ -116,10 +121,17 @@ class AuthService {
   }
 
   /**
-   * Şifre sıfırlama tokenı ile yeni şifre belirler.
+   * Şifre sıfırlama tokenı ile yeni şifre belirler (eski akış).
    */
   async resetPassword(token, newPassword) {
     return api.post('/api/auth/reset-password', { token, newPassword });
+  }
+
+  /**
+   * E-posta + 6 haneli kod ile yeni şifre belirler.
+   */
+  async confirmPasswordReset(email, code, newPassword) {
+    return api.post('/api/auth/reset-password', { email, code, newPassword });
   }
 
   /**
