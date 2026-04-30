@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { TopBar } from '../components/layout';
-import { Card, Button, Input, Badge } from '../components/ui';
+import { Card, Button, Input, Badge, ConfirmDialog, TwoFactorModal } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
 import authService from '../services/auth.service';
 import api from '../services/api.service';
@@ -57,6 +57,11 @@ const SettingsPage = ({ onLogout }) => {
   const [securitySuccess, setSecuritySuccess] = useState(false);
   const [securityError, setSecurityError] = useState('');
   const [securityLoading, setSecurityLoading] = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [twoFactorOpen, setTwoFactorOpen] = useState(false);
+  const [twoFactorAction, setTwoFactorAction] = useState('enable');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const currentUser = authService.getCurrentUser();
 
@@ -207,17 +212,36 @@ const SettingsPage = ({ onLogout }) => {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    const confirmed = window.confirm('Hesabınızı kalıcı olarak silmek istediğinize emin misiniz?');
-    if (!confirmed) return;
+  const handleDeleteAccount = () => {
+    setSecurityError('');
+    setConfirmDelete(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    setSecurityError('');
     try {
       await api.delete('/api/users/me');
       authService.logout();
       onLogout?.();
     } catch (err) {
       setSecurityError(err.message || 'Hesap silinemedi.');
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
     }
+  };
+
+  const handleToggle2fa = () => {
+    setSecurityError('');
+    setTwoFactorAction(twoFactorEnabled ? 'disable' : 'enable');
+    setTwoFactorOpen(true);
+  };
+
+  const handle2faSuccess = () => {
+    setTwoFactorEnabled((prev) => !prev);
+    setSecuritySuccess(true);
+    setTimeout(() => setSecuritySuccess(false), 3000);
   };
 
   const renderProfileTab = () => (
@@ -285,12 +309,21 @@ const SettingsPage = ({ onLogout }) => {
       </Card>
 
       <Card style={{ padding: '18px', marginBottom: '14px', background: colors.surfaceAlt }} hover={false}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <div>
             <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px' }}>İki Faktörlü Doğrulama</div>
-            <div style={{ fontSize: '13px', color: colors.textSecondary }}>Hesabınızı daha güvenli hale getirin</div>
+            <div style={{ fontSize: '13px', color: colors.textSecondary }}>
+              E-posta ile gönderilen tek seferlik kodla hesabınızı koruyun.
+            </div>
           </div>
-          <Badge variant="warning">Kapalı</Badge>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Badge variant={twoFactorEnabled ? 'success' : 'warning'}>
+              {twoFactorEnabled ? 'Açık' : 'Kapalı'}
+            </Badge>
+            <Button variant="outline" size="sm" onClick={handleToggle2fa}>
+              {twoFactorEnabled ? 'Kapat' : 'Etkinleştir'}
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -439,6 +472,25 @@ const SettingsPage = ({ onLogout }) => {
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Hesabı kalıcı olarak sil"
+        message="Hesabınızı silmek geri alınamaz bir işlemdir. Tüm sözleşmeleriniz, onay geçmişiniz ve hesap verileriniz kalıcı olarak silinir. Devam etmek istediğinize emin misiniz?"
+        confirmLabel={deleting ? 'Siliniyor...' : 'Hesabı Sil'}
+        cancelLabel="Vazgeç"
+        variant="danger"
+        loading={deleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
+
+      <TwoFactorModal
+        open={twoFactorOpen}
+        action={twoFactorAction}
+        onClose={() => setTwoFactorOpen(false)}
+        onSuccess={handle2faSuccess}
+      />
     </div>
   );
 };

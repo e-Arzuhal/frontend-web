@@ -24,7 +24,7 @@ describe('contractService', () => {
 
     await contractService.analyzeText('kira sözleşmesi metni');
 
-    expect(api.post).toHaveBeenCalledWith('/api/analysis/analyze', { text: 'kira sözleşmesi metni' });
+    expect(api.post).toHaveBeenCalledWith('/api/analysis/analyze', { text: 'kira sözleşmesi metni' }, { timeoutMs: 300000 });
   });
 
   // ── CRUD ─────────────────────────────────────────────────────────────────

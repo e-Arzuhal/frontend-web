@@ -152,18 +152,28 @@ export default function NotificationBell({ onNavigate }) {
                   type="button"
                   key={n.id}
                   onClick={async () => {
-                    if (n.read) return;
-                    try {
-                      await notificationService.markAsRead(n.id);
-                      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
-                      setUnreadCount((c) => Math.max(0, c - 1));
-
-                      if (onNavigate && n.contractId) {
-                        onNavigate('contract-detail', { contractId: n.contractId });
-                        setOpen(false);
+                    // Okunmamış bildirimleri okundu olarak işaretle, ama navigation
+                    // her durumda çalışsın (zaten okunmuş bildirime tekrar tıklayınca da
+                    // ilgili sözleşme/sayfa açılmalı).
+                    if (!n.read) {
+                      try {
+                        await notificationService.markAsRead(n.id);
+                        setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+                        setUnreadCount((c) => Math.max(0, c - 1));
+                      } catch {
+                        // Sessizce geç; periodic refresh ile düzelir.
                       }
-                    } catch {
-                      // Sessizce geç; periodic refresh ile düzelir.
+                    }
+                    if (onNavigate) {
+                      const isApprovalRelated = n.type === 'CONTRACT_PENDING_APPROVAL';
+                      if (isApprovalRelated) {
+                        onNavigate('approvals');
+                      } else if (n.contractId) {
+                        onNavigate('contract-detail', { contractId: n.contractId });
+                      } else {
+                        onNavigate('dashboard');
+                      }
+                      setOpen(false);
                     }
                   }}
                   style={{

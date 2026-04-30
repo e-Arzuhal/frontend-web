@@ -229,8 +229,18 @@ const Sidebar = ({ currentPage, onPageChange }) => {
           gap: '10px',
         }}
       >
-        <div style={{ fontFamily: fonts.heading, fontSize: '24px', fontWeight: 700, color: '#fff', lineHeight: 1 }}>
-          e-Arzuhal
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <img
+            src={`${process.env.PUBLIC_URL || ''}/e-Arzuhal-logo.png`}
+            alt="e-Arzuhal"
+            width={36}
+            height={36}
+            style={{ borderRadius: '8px', objectFit: 'contain', background: 'rgba(255,255,255,0.06)' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+          <div style={{ fontFamily: fonts.heading, fontSize: '24px', fontWeight: 700, color: '#fff', lineHeight: 1 }}>
+            e-Arzuhal
+          </div>
         </div>
 
         <div
