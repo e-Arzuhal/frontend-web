@@ -317,7 +317,7 @@ const RegisterPage = ({ onRegister }) => {
               icon={<ArrowRightIcon />}
               style={{ marginTop: '4px', boxShadow: '0 10px 18px rgba(15, 26, 48, 0.18)' }}
             >
-              Kayıt Ol
+              Kaydolun
             </Button>
           </form>
 

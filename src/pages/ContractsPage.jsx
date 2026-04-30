@@ -14,7 +14,13 @@ const ContractsPage = ({ onNavigate }) => {
     const fetchContracts = async () => {
       try {
         const data = await contractService.getAll();
-        setContracts(data);
+        // Defansif dedupe: id'ye göre tekilleştir (backend'de mükerrer kayıt
+        // varsa kullanıcıya tek satır gözüksün).
+        const byId = new Map();
+        (data || []).forEach((c) => {
+          if (c && c.id != null && !byId.has(c.id)) byId.set(c.id, c);
+        });
+        setContracts(Array.from(byId.values()));
       } catch (error) {
         console.error('Contracts fetch error:', error);
       } finally {

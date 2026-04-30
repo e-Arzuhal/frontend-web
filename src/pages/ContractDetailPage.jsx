@@ -170,6 +170,8 @@ const ContractDetailPage = ({ contractId, onBack }) => {
   const [editingAmount, setEditingAmount] = useState(false);
   const [amountDraft, setAmountDraft] = useState('');
   const [savingAmount, setSavingAmount] = useState(false);
+  const [requiredClauses, setRequiredClauses] = useState(null);
+  const [loadingClauses, setLoadingClauses] = useState(false);
 
   useEffect(() => {
     const fetchContract = async () => {
@@ -189,6 +191,17 @@ const ContractDetailPage = ({ contractId, onBack }) => {
     };
 
     fetchContract();
+  }, [contractId]);
+
+  useEffect(() => {
+    if (!contractId) return;
+    let cancelled = false;
+    setLoadingClauses(true);
+    contractService.getRequiredClauses(contractId)
+      .then((data) => { if (!cancelled) setRequiredClauses(data); })
+      .catch(() => { if (!cancelled) setRequiredClauses(null); })
+      .finally(() => { if (!cancelled) setLoadingClauses(false); });
+    return () => { cancelled = true; };
   }, [contractId]);
 
   const statusConfig = {
@@ -449,6 +462,99 @@ const ContractDetailPage = ({ contractId, onBack }) => {
               </Card>
             )}
 
+            {/* GraphRAG: Bu sözleşmede bulunması gereken maddeler */}
+            <Card style={{ padding: '24px', marginBottom: '24px' }} hover={false}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Bulunması Gereken Maddeler</h3>
+                <span style={{ fontSize: '11px', color: colors.textMuted }}>Kaynak: GraphRAG bilgi grafiği</span>
+              </div>
+              {loadingClauses && (
+                <div style={{ fontSize: '13px', color: colors.textMuted }}>Madde rehberi yükleniyor...</div>
+              )}
+              {!loadingClauses && requiredClauses && requiredClauses.available === false && (
+                <div style={{ fontSize: '13px', color: colors.textMuted }}>
+                  {requiredClauses.message || 'Madde rehberi şu anda erişilemiyor.'}
+                </div>
+              )}
+              {!loadingClauses && requiredClauses && requiredClauses.available !== false && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: colors.text }}>
+                      Zorunlu Maddeler
+                    </div>
+                    {(requiredClauses.mandatoryClauses || []).length === 0 ? (
+                      <div style={{ fontSize: '12px', color: colors.textMuted }}>Tanımlı zorunlu madde bulunamadı.</div>
+                    ) : (
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {(requiredClauses.mandatoryClauses || []).map((c, i) => (
+                          <li key={`m-${i}`} style={{
+                            padding: '10px 12px',
+                            background: colors.successBg,
+                            borderRadius: radius.md,
+                            fontSize: '13px',
+                          }}>
+                            <div style={{ fontWeight: 600, color: colors.text }}>{c.name || c.clause || `Madde ${i + 1}`}</div>
+                            {c.description && (
+                              <div style={{ fontSize: '12px', color: colors.textSecondary, marginTop: '4px' }}>
+                                {c.description}
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  {(requiredClauses.optionalClauses || []).length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: colors.text }}>
+                        Opsiyonel Maddeler
+                      </div>
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {(requiredClauses.optionalClauses || []).map((c, i) => (
+                          <li key={`o-${i}`} style={{
+                            padding: '10px 12px',
+                            background: colors.surfaceAlt,
+                            borderRadius: radius.md,
+                            fontSize: '13px',
+                          }}>
+                            <div style={{ fontWeight: 600, color: colors.text }}>{c.name || c.clause || `Madde ${i + 1}`}</div>
+                            {c.description && (
+                              <div style={{ fontSize: '12px', color: colors.textSecondary, marginTop: '4px' }}>
+                                {c.description}
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {(requiredClauses.lawArticles || []).length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: colors.text }}>
+                        İlgili Kanun Maddeleri
+                      </div>
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {(requiredClauses.lawArticles || []).slice(0, 6).map((a, i) => (
+                          <li key={`l-${i}`} style={{
+                            padding: '10px 12px',
+                            background: colors.surfaceAlt,
+                            borderRadius: radius.md,
+                            fontSize: '12px',
+                            color: colors.textSecondary,
+                          }}>
+                            <strong style={{ color: colors.text }}>
+                              {(a.law_name || '') + ' ' + (a.article_number || '')}
+                            </strong>
+                            {a.summary && <span> — {a.summary}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+
             {/* Detaylar */}
             <Card style={{ padding: '24px' }} hover={false}>
               <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Sözleşme Detayları</h3>
@@ -493,7 +599,9 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                     <div>
-                      <div style={{ fontSize: '14px', fontWeight: 600 }}>{contract.ownerUsername}</div>
+                      <div style={{ fontSize: '14px', fontWeight: 600 }}>
+                        {contract.ownerFullName || contract.ownerUsername}
+                      </div>
                       <div style={{ fontSize: '12px', color: colors.textMuted }}>Sözleşme Sahibi</div>
                     </div>
                     <Badge variant="success">Oluşturan</Badge>

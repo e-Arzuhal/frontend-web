@@ -47,6 +47,9 @@ export default function ChatbotWidget() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [suggested, setSuggested] = useState(SUGGESTED_INITIAL);
+  const [contractOptions, setContractOptions] = useState([]);
+  const [selectedContractId, setSelectedContractId] = useState(null);
+  const [pendingMessage, setPendingMessage] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -79,20 +82,30 @@ export default function ChatbotWidget() {
   const getHistory = () =>
     messages.map((m) => ({ role: m.role, content: m.content }));
 
-  const send = async (text) => {
-    const trimmed = text.trim();
+  const send = async (text, opts = {}) => {
+    const trimmed = (text ?? '').trim();
+    const contractId = opts.contractId ?? selectedContractId;
+    const skipUserBubble = opts.skipUserBubble === true;
+
     if (!trimmed || loading) return;
 
-    const userMsg = { role: 'user', content: trimmed };
-    setMessages((prev) => [...prev, userMsg]);
+    if (!skipUserBubble) {
+      setMessages((prev) => [...prev, { role: 'user', content: trimmed }]);
+    }
     setInput('');
     setSuggested([]);
+    setContractOptions([]);
     setLoading(true);
 
     try {
-      const res = await chatbotService.sendMessage(trimmed, getHistory());
+      const res = await chatbotService.sendMessage(trimmed, getHistory(), contractId || null);
       setMessages((prev) => [...prev, { role: 'assistant', content: res.response }]);
-      if (res.suggestedQuestions?.length) setSuggested(res.suggestedQuestions);
+      if (res.requiresContractSelection && Array.isArray(res.contractOptions) && res.contractOptions.length) {
+        setContractOptions(res.contractOptions);
+        setPendingMessage(trimmed);
+      } else if (res.suggestedQuestions?.length) {
+        setSuggested(res.suggestedQuestions);
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -100,6 +113,20 @@ export default function ChatbotWidget() {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const pickContract = async (option) => {
+    setSelectedContractId(option.id);
+    const labelText = `Seçilen sözleşme: ${option.title || ('#' + option.id)}`;
+    setMessages((prev) => [...prev, { role: 'user', content: labelText }]);
+    setContractOptions([]);
+    if (pendingMessage) {
+      const msg = pendingMessage;
+      setPendingMessage('');
+      // pendingMessage'ı kullanıcıya tekrar baloncuk olarak göstermeden,
+      // sözleşme seçimini taşıyarak yeniden gönder.
+      await send(msg, { contractId: option.id, skipUserBubble: true });
     }
   };
 
@@ -241,6 +268,50 @@ export default function ChatbotWidget() {
 
             <div ref={messagesEndRef} />
           </div>
+
+          {/* Sözleşme Seçimi */}
+          {contractOptions.length > 0 && !loading && (
+            <div style={{
+              padding: '10px 16px',
+              borderTop: `1px solid ${colors.border}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              flexShrink: 0,
+              background: colors.surface,
+              maxHeight: '180px',
+              overflowY: 'auto',
+            }}>
+              <div style={{ fontSize: '11px', color: colors.textMuted, fontFamily: fonts.body, marginBottom: '2px' }}>
+                Hangi sözleşme hakkında konuşalım?
+              </div>
+              {contractOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => pickContract(opt)}
+                  style={{
+                    textAlign: 'left',
+                    padding: '8px 12px',
+                    borderRadius: radius.md,
+                    border: `1px solid ${colors.border}`,
+                    background: colors.card,
+                    color: colors.text,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    fontFamily: fonts.body,
+                    transition: 'border-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = colors.accent; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = colors.border; }}
+                >
+                  <div style={{ fontWeight: 600 }}>{opt.title || `Sözleşme #${opt.id}`}</div>
+                  <div style={{ fontSize: '11px', color: colors.textMuted }}>
+                    {opt.type || 'Sözleşme'} · {opt.status || ''}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Önerilen Sorular */}
           {suggested.length > 0 && !loading && (
