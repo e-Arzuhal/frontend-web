@@ -59,6 +59,9 @@ const VerificationPage = () => {
   const [verificationStatus, setVerificationStatus] = useState(null); // VerificationResponse
   const [activeMode, setActiveMode] = useState('manual'); // 'manual' | 'camera'
   const [showNfcModal, setShowNfcModal] = useState(false);
+  // 'info' → sadece NFC mobil bilgisi; 'saved' → manuel form gönderildi, NFC mobil için
+  const [nfcModalReason, setNfcModalReason] = useState('info');
+  const [isSavingForm, setIsSavingForm] = useState(false);
   const [form, setForm] = useState({ tcNo: '', firstName: '', lastName: '', dateOfBirth: '' });
   const [tcError, setTcError] = useState('');
   const [submitError, setSubmitError] = useState('');
@@ -125,13 +128,49 @@ const VerificationPage = () => {
     }
   };
 
-  /* Manuel form gönder — web'de yalnızca bilgi alınır; doğrulama mobil NFC ile yapılır. */
+  /* Manuel form gönder — web'de yalnızca bilgi backend'e MANUEL kaydı yapılır;
+     gerçek doğrulama mobil NFC ile yapılır. handleSubmit hem kayıt hem
+     bilgilendirme popup'ı göstermekle sorumlu. */
   const handleSubmit = async () => {
     if (!isValidTcNo(form.tcNo)) { setTcError('Geçersiz TC Kimlik Numarası.'); return; }
     if (!form.firstName.trim() || !form.lastName.trim()) {
       setSubmitError('Ad ve soyad zorunludur.'); return;
     }
+    if (!form.dateOfBirth) {
+      setSubmitError('Doğum tarihi zorunludur.'); return;
+    }
     setSubmitError('');
+    setIsSavingForm(true);
+    try {
+      // MANUEL yöntemle bilgileri sisteme yaz; backend bunu PENDING/MANUAL
+      // olarak işaretler — mobil NFC sonrası VERIFIED'e çekilir.
+      await verificationService.verify({
+        tcNo: form.tcNo,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        dateOfBirth: form.dateOfBirth,
+        method: 'MANUAL',
+      });
+    } catch (err) {
+      const raw = err?.message || '';
+      // 4xx → kullanıcı düzeltebileceği bir hata (TC algoritma, ad-soyad uyumsuz vs.)
+      // — modal göstermek yerine inline hata göster ki form hâlâ düzenlenebilir.
+      if (/HTTP 4\d{2}|Geçersiz|zaten/i.test(raw)) {
+        setSubmitError(raw || 'Girdiğiniz bilgiler doğrulanamadı. TC Kimlik bilgilerini kontrol edin.');
+        setIsSavingForm(false);
+        return;
+      }
+      // 5xx / network → arka uç şu an erişilemiyor; kullanıcıyı yine de
+      // mobil yönlendirmesine gönder (bilgi kaybolmasın).
+    } finally {
+      setIsSavingForm(false);
+    }
+    setNfcModalReason('saved');
+    setShowNfcModal(true);
+  };
+
+  const handleNfcInfo = () => {
+    setNfcModalReason('info');
     setShowNfcModal(true);
   };
 
@@ -141,6 +180,7 @@ const VerificationPage = () => {
     setIsCapturing(true);
     setTimeout(() => {
       setIsCapturing(false);
+      setNfcModalReason('info');
       setShowNfcModal(true);
     }, 800);
   };
@@ -310,7 +350,7 @@ const VerificationPage = () => {
       </div>
 
       <button
-        onClick={() => setShowNfcModal(true)}
+        onClick={handleNfcInfo}
         style={{
           display: 'flex', alignItems: 'center', gap: '14px', width: '100%',
           padding: '14px 16px', background: 'rgba(200,150,62,0.07)',
@@ -334,9 +374,10 @@ const VerificationPage = () => {
         <Button
           variant="accent"
           onClick={handleSubmit}
-          disabled={form.tcNo.length !== 11 || !!tcError || !form.firstName.trim() || !form.lastName.trim()}
+          loading={isSavingForm}
+          disabled={form.tcNo.length !== 11 || !!tcError || !form.firstName.trim() || !form.lastName.trim() || isSavingForm}
         >
-          Devam Et
+          {isSavingForm ? 'Kaydediliyor...' : 'Devam Et'}
         </Button>
       </div>
     </Card>
@@ -413,7 +454,7 @@ const VerificationPage = () => {
 
       {/* NFC kimlik doğrulama — sadece mobilde mümkün */}
       <button
-        onClick={() => setShowNfcModal(true)}
+        onClick={handleNfcInfo}
         style={{
           display: 'flex', alignItems: 'center', gap: '14px', width: '100%',
           padding: '14px 16px', background: 'rgba(200,150,62,0.07)',
@@ -432,41 +473,6 @@ const VerificationPage = () => {
         </div>
         <span style={{ color: colors.textMuted, fontSize: '18px' }}>›</span>
       </button>
-
-      {/* NFC Bilgi Modalı */}
-      {showNfcModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(15,26,48,0.75)',
-          zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
-        }} onClick={() => setShowNfcModal(false)}>
-          <div style={{
-            background: '#fff', borderRadius: '16px', padding: '36px 32px',
-            maxWidth: '480px', width: '100%', textAlign: 'center',
-            boxShadow: '0 20px 60px rgba(15,26,48,0.25)',
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📱</div>
-            <h3 style={{ fontFamily: `'Playfair Display', serif`, fontSize: '20px', color: colors.text, marginBottom: '12px' }}>
-              NFC Kimlik Doğrulama
-            </h3>
-            <p style={{ fontSize: '14px', color: colors.textSecondary, lineHeight: 1.7, marginBottom: '8px' }}>
-              NFC ile T.C. Kimlik Kartı doğrulaması yalnızca <strong>e-Arzuhal mobil uygulaması</strong> üzerinden yapılabilmektedir.
-            </p>
-            <p style={{ fontSize: '13px', color: colors.textMuted, lineHeight: 1.6, marginBottom: '28px' }}>
-              Web tarayıcıları NFC okuyucusuna güvenli erişim sağlayamaz. Kimliğinizi NFC ile doğrulamak için lütfen mobil uygulamamızı kullanın.
-            </p>
-            <button
-              onClick={() => setShowNfcModal(false)}
-              style={{
-                background: colors.primary, color: colors.accent, border: 'none',
-                borderRadius: '10px', padding: '13px 28px', fontSize: '14px',
-                fontWeight: 600, cursor: 'pointer', width: '100%',
-              }}
-            >
-              Anladım
-            </button>
-          </div>
-        </div>
-      )}
 
       {isCameraActive && (
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -506,6 +512,66 @@ const VerificationPage = () => {
           </>
         )}
       </div>
+
+      {/* NFC Bilgi / Kayıt Modalı — uygulama içi popup, browser dialog değil */}
+      {showNfcModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15,26,48,0.75)',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+          }}
+          onClick={() => setShowNfcModal(false)}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: '16px', padding: '36px 32px',
+              maxWidth: '480px', width: '100%', textAlign: 'center',
+              boxShadow: '0 20px 60px rgba(15,26,48,0.25)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>
+              {nfcModalReason === 'saved' ? '✅' : '📱'}
+            </div>
+            <h3 style={{ fontFamily: `'Playfair Display', serif`, fontSize: '20px', color: colors.text, marginBottom: '12px' }}>
+              {nfcModalReason === 'saved'
+                ? 'Bilgileriniz Kaydedildi'
+                : 'NFC Kimlik Doğrulama'}
+            </h3>
+            {nfcModalReason === 'saved' ? (
+              <>
+                <p style={{ fontSize: '14px', color: colors.textSecondary, lineHeight: 1.7, marginBottom: '8px' }}>
+                  TC Kimlik bilgileriniz sisteme kaydedildi. Doğrulamayı tamamlamak için
+                  <strong> e-Arzuhal mobil uygulamasında NFC tarama</strong> yapmanız gerekmektedir.
+                </p>
+                <p style={{ fontSize: '13px', color: colors.textMuted, lineHeight: 1.6, marginBottom: '28px' }}>
+                  Mobil uygulamada giriş yaptıktan sonra "Kimlik Doğrulama" sayfasına gidin
+                  ve T.C. Kimlik Kartınızı telefonun NFC alanına yaklaştırın.
+                </p>
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: '14px', color: colors.textSecondary, lineHeight: 1.7, marginBottom: '8px' }}>
+                  NFC ile T.C. Kimlik Kartı doğrulaması yalnızca <strong>e-Arzuhal mobil uygulaması</strong> üzerinden yapılabilmektedir.
+                </p>
+                <p style={{ fontSize: '13px', color: colors.textMuted, lineHeight: 1.6, marginBottom: '28px' }}>
+                  Web tarayıcıları NFC okuyucusuna güvenli erişim sağlayamaz. Kimliğinizi NFC ile doğrulamak için lütfen mobil uygulamamızı kullanın.
+                </p>
+              </>
+            )}
+            <button
+              onClick={() => setShowNfcModal(false)}
+              style={{
+                background: colors.primary, color: colors.accent, border: 'none',
+                borderRadius: '10px', padding: '13px 28px', fontSize: '14px',
+                fontWeight: 600, cursor: 'pointer', width: '100%',
+              }}
+            >
+              Anladım
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

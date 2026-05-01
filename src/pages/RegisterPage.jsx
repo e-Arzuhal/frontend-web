@@ -95,10 +95,17 @@ const RegisterPage = ({ onRegister }) => {
     setIsLoading(true);
 
     try {
-      // Split name into first and last name
-      const nameParts = formData.name.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+      // İsim ayrıştırma: kullanıcının 2 adı varsa (örn. "Enes Burak Atay")
+      // soyadı son kelime olmalı, ad alanına geri kalanı yazılmalı.
+      const nameParts = formData.name.trim().split(/\s+/).filter(Boolean);
+      let firstName = '';
+      let lastName = '';
+      if (nameParts.length === 1) {
+        firstName = nameParts[0];
+      } else if (nameParts.length >= 2) {
+        firstName = nameParts.slice(0, -1).join(' ');
+        lastName = nameParts[nameParts.length - 1];
+      }
 
       const response = await authService.register({
         username: formData.email.split('@')[0], // Use email prefix as username

@@ -6,7 +6,7 @@ import contractService from '../services/contract.service';
 import useVoiceInput from '../hooks/useVoiceInput';
 import { labelForClause, placeholderForClause } from '../utils/clauseLabels';
 
-const STEPS = ['Metin Girişi', 'Sözleşme Önerisi', 'PDF Önizleme', 'Onay & İmza'];
+const STEPS = ['Metin Girişi', 'Sözleşme Önerisi', 'PDF Önizleme', 'Tamamlandı'];
 
 const CheckIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
@@ -92,6 +92,8 @@ const CreateContractPage = ({ onNavigate }) => {
   const [counterpartyTcError, setCounterpartyTcError] = useState('');
   const [counterpartyNameInput, setCounterpartyNameInput] = useState('');
   const [voiceError, setVoiceError] = useState('');
+  const [requiredClauses, setRequiredClauses] = useState(null);
+  const [loadingClauses, setLoadingClauses] = useState(false);
 
   /* ── Voice-to-Text ── */
   const handleVoiceResult = useCallback((text) => {
@@ -140,16 +142,49 @@ const CreateContractPage = ({ onNavigate }) => {
     setIsAnalyzing(true);
     try {
       const realResult = await contractService.analyzeText(userInput);
-      const fields = realResult.nlp_result?.extracted_fields || {};
+      // NLP-server `extracted_entities` (raw NER) döner; eski kod `extracted_fields`
+      // arıyordu — bu nedenle tutar boş kalıp PDF'te MADDE 2 hiç çıkmıyordu.
+      // Hem yeni (entities) hem eski (fields) yapıyı uyumlu okuyalım.
+      const entitiesRaw = realResult.nlp_result?.extracted_entities
+        || realResult.nlpResult?.extractedEntities
+        || {};
+      const fieldsRaw = realResult.nlp_result?.extracted_fields || {};
       const graphSuggestions = realResult.graphrag_result?.suggestions?.suggestions || [];
       const matched = realResult.graphrag_result?.analysis?.matched_fields || [];
       const missing = realResult.graphrag_result?.analysis?.missing_required || [];
+      // Gemini'nin eksik zorunlu alanlar için ürettiği risk listesi —
+      // sözleşme kayıt edilirken backend'e gönderilir, kayıt sonrası
+      // ContractDetailPage burada gerekçe + TBK madde olarak gösterir.
+      const legalRisks = realResult.graphrag_result?.legal_analysis?.risks || [];
+      // 503 fallback'in kullanılıp kullanılmadığı: Gemini gerçek bir analiz
+      // yaptıysa risks içinde tbk_article > 0 ya da explanation cümle olur;
+      // fallback'te explanation tipik olarak "{f} alanı eksik." kalıbındadır.
+      const fallbackUsed = legalRisks.length > 0 && legalRisks.every(r =>
+        !r.tbk_article && /alanı eksik\.?$/i.test(r.explanation || '')
+      );
+
+      // Yardımcı: entitiesRaw["MONEY"] -> ilk değeri al, fallback fieldsRaw.tutar
+      const firstOf = (key) => {
+        const arr = entitiesRaw[key];
+        if (Array.isArray(arr) && arr.length) return arr[0];
+        return null;
+      };
+      // Kullanıcının metninden 20000 tl, 50.000 TL, 1500₺ vb. yakalama —
+      // NLP entity boş gelirse son çare olarak metinden çek.
+      const moneyFromText = () => {
+        const m = (userInput || '').match(/(\d[\d.,]*)\s*(tl|try|₺|lira)\b/i);
+        return m ? m[0] : null;
+      };
+
+      const moneyVal = firstOf('MONEY') || fieldsRaw.tutar || moneyFromText();
+      const dateVal = firstOf('DATE') || fieldsRaw.tarih;
+      const persons = entitiesRaw.PERSON || (Array.isArray(fieldsRaw.taraflar) ? fieldsRaw.taraflar : []);
 
       const entityList = [];
-      if (fields.tutar) entityList.push({ label: 'Tutar', type: 'MONEY', value: fields.tutar });
-      if (fields.sure) entityList.push({ label: 'Süre', type: 'DURATION', value: fields.sure });
-      if (fields.tarih) entityList.push({ label: 'Tarih', type: 'DATE', value: fields.tarih });
-      (fields.taraflar || []).forEach((t, i) =>
+      if (moneyVal) entityList.push({ label: 'Tutar', type: 'MONEY', value: moneyVal });
+      if (fieldsRaw.sure) entityList.push({ label: 'Süre', type: 'DURATION', value: fieldsRaw.sure });
+      if (dateVal) entityList.push({ label: 'Tarih', type: 'DATE', value: dateVal });
+      (persons || []).forEach((t, i) =>
         entityList.push({ label: i === 0 ? 'Karşı Taraf' : 'Taraf', type: 'PERSON', value: t })
       );
 
@@ -162,13 +197,29 @@ const CreateContractPage = ({ onNavigate }) => {
         };
       };
 
+      // Risks'i alan adına göre indeksle — eksik zorunlu maddelerin yanına
+      // gerekçe + TBK madde eklemek için.
+      const risksByField = {};
+      legalRisks.forEach(r => {
+        if (r && r.field) risksByField[r.field] = r;
+      });
+
       setAnalysisResult({
         contractType: realResult.contract_type_display?.replace(/_/g, ' ') || realResult.contract_type,
         contractTypeEn: realResult.contract_type,
         confidence: realResult.confidence || 0,
         entities: entityList,
         mandatoryClauses: matched.map(normalizeClause),
-        missingClauses: missing.map(normalizeClause),
+        missingClauses: missing.map(f => {
+          const base = normalizeClause(f);
+          const risk = risksByField[base.id];
+          return {
+            ...base,
+            explanation: risk?.explanation || '',
+            tbkArticle: risk?.tbk_article ?? null,
+            riskLevel: risk?.risk_level || null,
+          };
+        }),
         suggestedClauses: graphSuggestions.map(s => ({
           id: s.field_name,
           name: labelForClause(s.field_name),
@@ -176,6 +227,8 @@ const CreateContractPage = ({ onNavigate }) => {
           usagePercent: s.usage_percent ?? null,
           recommended: s.necessity === 'required' || s.necessity === 'recommended',
         })),
+        legalRisks,
+        fallbackUsed,
       });
       setMissingFieldValues({});
       setCurrentStep(1);
@@ -201,28 +254,45 @@ const CreateContractPage = ({ onNavigate }) => {
   const getEnrichedContent = () => {
     let content = userInput;
 
-    // Eksik zorunlu maddeler — kullanıcının doldurduğu değerleri ekle
+    // Eksik zorunlu maddeler — kullanıcının doldurduğu değerleri PDF'te
+    // "Eksik Maddeler" başlığı atmadan, doğal bir paragraf olarak ekleyelim;
+    // önceki versiyon "--- Eksik Maddeler ---" ayraç bırakıp PDF'i çirkin
+    // gösteriyordu.
     const missingClauses = analysisResult?.missingClauses || [];
     const filledMissing = missingClauses.filter(c => missingFieldValues[c.id]?.trim());
     if (filledMissing.length > 0) {
       const additions = filledMissing
-        .map(c => `\n\n${labelForClause(c.id) || c.name}: ${missingFieldValues[c.id].trim()}`)
-        .join('');
-      content += '\n\n--- Eksik Maddeler ---' + additions;
+        .map(c => `${labelForClause(c.id) || c.name}: ${missingFieldValues[c.id].trim()}`)
+        .join('\n');
+      content += '\n\n' + additions;
     }
 
-    // Seçilen önerilen maddeler
+    // Seçilen önerilen maddeler — ayraç başlık olmadan ekle
     const suggestions = analysisResult?.suggestedClauses || [];
     const selected = suggestions.filter(s => selectedClauses.includes(s.id));
     if (selected.length > 0) {
       const additions = selected
-        .map(s => `\n\n${labelForClause(s.id) || s.name}: ${s.description}`)
-        .join('');
-      content += '\n\n--- Ek Maddeler ---' + additions;
+        .map(s => `${labelForClause(s.id) || s.name}: ${s.description}`)
+        .join('\n');
+      content += '\n\n' + additions;
     }
 
     return content;
   };
+
+  // Sözleşme oluşturulduktan sonra rehberi yükle
+  useEffect(() => {
+    if (currentStep !== 2) return;
+    const type = analysisResult?.contractTypeEn || analysisResult?.contractType;
+    if (!type) return;
+    let cancelled = false;
+    setLoadingClauses(true);
+    contractService.getRequiredClausesByType(type)
+      .then((data) => { if (!cancelled) setRequiredClauses(data); })
+      .catch(() => { if (!cancelled) setRequiredClauses(null); })
+      .finally(() => { if (!cancelled) setLoadingClauses(false); });
+    return () => { cancelled = true; };
+  }, [currentStep, analysisResult]);
 
   const handleSaveAndPreview = async () => {
     setIsSaving(true);
@@ -231,6 +301,18 @@ const CreateContractPage = ({ onNavigate }) => {
       const entities = analysisResult?.entities || [];
       const tutar = entities.find(e => e.type === 'MONEY')?.value || '';
       const karsıTaraf = entities.find(e => e.label === 'Karşı Taraf' || e.label === 'Borç Alan' || e.type === 'PERSON')?.value || '';
+      // Backend'in eksik madde gerekçelerini persiste edebilmesi için
+      // Gemini risk listesini olduğu gibi geçirelim — anahtarlar
+      // AnalysisContextDto.risks ile aynı camelCase'e çevriliyor değil, JSON
+      // map olarak iletildiğinden snake_case alanları korunur.
+      const risks = (analysisResult?.legalRisks || []).map(r => ({
+        field: r.field,
+        riskLevel: r.risk_level,
+        tbkArticle: r.tbk_article,
+        explanation: r.explanation,
+        suggestion: r.suggestion,
+      }));
+
       const saved = await contractService.create({
         title: analysisResult?.contractType || 'Yeni Sözleşme',
         type: analysisResult?.contractTypeEn || analysisResult?.contractType || 'GENEL',
@@ -239,6 +321,14 @@ const CreateContractPage = ({ onNavigate }) => {
         counterpartyName: counterpartyNameInput || karsıTaraf,
         counterpartyRole: '',
         counterpartyTcKimlik: counterpartyTc || null,
+        analysisContext: {
+          contractType: analysisResult?.contractTypeEn,
+          contractTypeDisplay: analysisResult?.contractType,
+          confidence: analysisResult?.confidence,
+          missingRequired: (analysisResult?.missingClauses || []).map(c => c.id),
+          risks,
+          fallbackUsed: !!analysisResult?.fallbackUsed,
+        },
       });
       setContractId(saved.id);
       setCurrentStep(2);
@@ -446,44 +536,89 @@ const CreateContractPage = ({ onNavigate }) => {
             </p>
           </div>
 
-          {/* Eksik Zorunlu Maddeler — kullanıcıdan input al */}
+          {/* Eksik Zorunlu Maddeler — kullanıcıdan input al + Gemini'nin
+              hangi TBK maddesinden çıkardığını göster. */}
           {missingClauses.length > 0 && (
             <Card style={{ padding: '16px 18px', marginBottom: '16px', border: `1.5px solid ${colors.error}44` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <span style={{ color: colors.error, display: 'inline-flex' }}><ZapIcon /></span>
                 <h4 style={{ fontSize: '14px', fontWeight: 700, color: colors.error, margin: 0 }}>
                   Eksik Zorunlu Maddeler
                 </h4>
               </div>
-              <p style={{ fontSize: '12px', color: colors.textSecondary, marginBottom: '14px', lineHeight: 1.5 }}>
-                Aşağıdaki zorunlu alanlar sözleşme metninde tespit edilemedi. Lütfen doldurun.
-              </p>
-              {missingClauses.map(clause => (
-                <div key={clause.id} style={{ marginBottom: '12px' }}>
-                  <label style={{
-                    display: 'block', fontSize: '12px', fontWeight: 600,
-                    color: colors.text, marginBottom: '6px',
-                  }}>
-                    {clause.name} *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={placeholderForClause(clause.id) || clause.description || `${clause.name} bilgisini girin`}
-                    value={missingFieldValues[clause.id] || ''}
-                    onChange={e => setMissingFieldValues(prev => ({ ...prev, [clause.id]: e.target.value }))}
-                    style={{
-                      width: '100%', padding: '9px 12px',
-                      background: colors.surfaceAlt,
-                      border: `1px solid ${colors.border}`,
-                      borderRadius: radius.md, color: colors.text,
-                      fontFamily: fonts.body, fontSize: '13px',
-                      outline: 'none', boxSizing: 'border-box',
-                    }}
-                    onFocus={e => { e.target.style.borderColor = colors.accent; }}
-                    onBlur={e => { e.target.style.borderColor = colors.border; }}
-                  />
+              {analysisResult?.fallbackUsed && (
+                <div style={{
+                  padding: '8px 10px', marginBottom: '10px',
+                  background: 'rgba(232, 200, 130, 0.12)',
+                  border: '1px solid rgba(232, 200, 130, 0.45)',
+                  borderRadius: radius.md, fontSize: '11px', color: '#7a6535', lineHeight: 1.4,
+                }}>
+                  AI servisi şu an erişilemiyor — temel uyarı gösterildi.
                 </div>
-              ))}
+              )}
+              <p style={{ fontSize: '12px', color: colors.textSecondary, marginBottom: '14px', lineHeight: 1.5 }}>
+                Aşağıdaki zorunlu alanlar sözleşme metninde tespit edilemedi. Her madde için
+                neden gerekli olduğu ve hangi kanun maddesine dayandığı belirtilmiştir.
+              </p>
+              {missingClauses.map(clause => {
+                const sevColor = clause.riskLevel === 'HIGH' ? colors.error
+                  : clause.riskLevel === 'MEDIUM' ? colors.warning
+                  : clause.riskLevel === 'LOW' ? colors.textMuted : null;
+                const sevLabel = clause.riskLevel === 'HIGH' ? 'YÜKSEK'
+                  : clause.riskLevel === 'MEDIUM' ? 'ORTA'
+                  : clause.riskLevel === 'LOW' ? 'DÜŞÜK' : null;
+                const lawText = clause.tbkArticle
+                  ? `TBK Madde ${clause.tbkArticle}`
+                  : 'İlgili kanun maddesi tespit edilemedi';
+                return (
+                  <div key={clause.id} style={{ marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: colors.text }}>
+                        {clause.name} *
+                      </label>
+                      {sevLabel && (
+                        <span style={{
+                          fontSize: '10px', fontWeight: 700, padding: '2px 6px',
+                          borderRadius: radius.sm || '4px',
+                          background: sevColor + '22', color: sevColor,
+                        }}>
+                          {sevLabel}
+                        </span>
+                      )}
+                      <span style={{
+                        fontSize: '10px', color: colors.textMuted,
+                        marginLeft: 'auto', fontStyle: 'italic',
+                      }}>
+                        {lawText}
+                      </span>
+                    </div>
+                    {clause.explanation && (
+                      <p style={{
+                        fontSize: '11px', color: colors.textSecondary,
+                        marginBottom: '6px', lineHeight: 1.5,
+                      }}>
+                        {clause.explanation}
+                      </p>
+                    )}
+                    <input
+                      type="text"
+                      placeholder={placeholderForClause(clause.id) || clause.description || `${clause.name} bilgisini girin`}
+                      value={missingFieldValues[clause.id] || ''}
+                      onChange={e => setMissingFieldValues(prev => ({ ...prev, [clause.id]: e.target.value }))}
+                      style={{
+                        width: '100%', padding: '9px 12px',
+                        background: colors.surfaceAlt,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: radius.md, color: colors.text,
+                        fontFamily: fonts.body, fontSize: '13px',
+                        outline: 'none', boxSizing: 'border-box',
+                      }}
+                      onFocus={e => { e.target.style.borderColor = colors.accent; }}
+                      onBlur={e => { e.target.style.borderColor = colors.border; }}
+                    />
+                  </div>
+                );
+              })}
             </Card>
           )}
 
@@ -712,21 +847,94 @@ const CreateContractPage = ({ onNavigate }) => {
           </div>
         </Card>
 
+        {/* Bulunması Gereken Maddeler — GraphRAG rehberi */}
+        <Card style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: 700 }}>Bulunması Gereken Maddeler</h4>
+            <span style={{ fontSize: '10px', color: colors.textMuted }}>GraphRAG</span>
+          </div>
+          {loadingClauses && (
+            <div style={{ fontSize: '12px', color: colors.textMuted }}>Rehber yükleniyor...</div>
+          )}
+          {!loadingClauses && requiredClauses && requiredClauses.available === false && (
+            <div style={{ fontSize: '12px', color: colors.textMuted }}>
+              {requiredClauses.message || 'Madde rehberi şu anda erişilemiyor.'}
+            </div>
+          )}
+          {!loadingClauses && requiredClauses && requiredClauses.available !== false && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {(requiredClauses.mandatoryClauses || []).length > 0 && (
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: colors.text, marginBottom: '6px' }}>
+                    Zorunlu
+                  </div>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {(requiredClauses.mandatoryClauses || []).slice(0, 8).map((c, i) => (
+                      <li key={`m-${i}`} style={{
+                        padding: '6px 8px', background: colors.successBg,
+                        borderRadius: radius.md, fontSize: '12px',
+                      }}>
+                        <strong style={{ color: colors.text }}>{c.name || c.clause || `Madde ${i + 1}`}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(requiredClauses.optionalClauses || []).length > 0 && (
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: colors.text, marginBottom: '6px' }}>
+                    Opsiyonel
+                  </div>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {(requiredClauses.optionalClauses || []).slice(0, 6).map((c, i) => (
+                      <li key={`o-${i}`} style={{
+                        padding: '6px 8px', background: colors.surfaceAlt,
+                        borderRadius: radius.md, fontSize: '12px',
+                      }}>
+                        {c.name || c.clause || `Madde ${i + 1}`}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(requiredClauses.lawArticles || []).length > 0 && (
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: colors.text, marginBottom: '6px' }}>
+                    İlgili Kanun
+                  </div>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {(requiredClauses.lawArticles || []).slice(0, 4).map((a, i) => (
+                      <li key={`l-${i}`} style={{
+                        padding: '6px 8px', background: colors.surfaceAlt,
+                        borderRadius: radius.md, fontSize: '11px', color: colors.textSecondary,
+                      }}>
+                        <strong style={{ color: colors.text }}>{(a.law_name || '') + ' ' + (a.article_number || '')}</strong>
+                        {a.summary && <span> — {a.summary}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+
         {/* Düzenle */}
         <Card style={{ padding: '20px' }}>
           <h4 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>Düzenle</h4>
           <p style={{ fontSize: '12px', color: colors.textSecondary, marginBottom: '14px', lineHeight: 1.5 }}>
-            Sözleşme içeriğini düzenlemek isterseniz geri dönebilirsiniz.
+            Eksik veya yanlış maddeleri düzeltmek için geri dönebilir, sonra tekrar PDF üretebilirsiniz.
           </p>
           <Button variant="outline" fullWidth onClick={() => setCurrentStep(1)}>
             Maddeleri Düzenle
           </Button>
         </Card>
 
-        {/* Aksiyonlar */}
+        {/* Aksiyonlar — "Onaya Gönder" sözleşme detayında yapılır;
+            burada sadece tamamlama ve indirme. */}
         <Button variant="accent" fullWidth onClick={() => setCurrentStep(3)}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', justifyContent: 'center' }}>
-            <CheckIcon /> Onaya Gönder
+            <CheckIcon /> Tamamla
           </span>
         </Button>
         <Button variant="outline" fullWidth onClick={handleDownloadPdf} disabled={!pdfBlobUrl}>
@@ -745,7 +953,9 @@ const CreateContractPage = ({ onNavigate }) => {
       </div>
       <h3 style={{ fontFamily: fonts.heading, fontSize: '20px', marginBottom: '8px' }}>Sözleşme Oluşturuldu</h3>
       <p style={{ color: colors.textSecondary, marginBottom: '28px' }}>
-        Sözleşmeniz başarıyla kaydedildi ve PDF hazırlandı.
+        Sözleşmeniz taslak olarak kaydedildi ve PDF hazırlandı. Karşı tarafa
+        iletmek için "Sözleşmelerim" sayfasından sözleşmeyi açıp <strong>Onaya Gönder</strong>'e
+        basabilirsiniz.
       </p>
       <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
         {contractId && onNavigate && (
