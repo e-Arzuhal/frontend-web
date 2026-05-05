@@ -172,6 +172,9 @@ const ContractDetailPage = ({ contractId, onBack }) => {
   const [savingAmount, setSavingAmount] = useState(false);
   const [requiredClauses, setRequiredClauses] = useState(null);
   const [loadingClauses, setLoadingClauses] = useState(false);
+  const [editingContent, setEditingContent] = useState(false);
+  const [contentDraft, setContentDraft] = useState('');
+  const [savingContent, setSavingContent] = useState(false);
 
   useEffect(() => {
     const fetchContract = async () => {
@@ -182,6 +185,16 @@ const ContractDetailPage = ({ contractId, onBack }) => {
       }
       try {
         const data = await contractService.getById(contractId);
+        // Backend amount alanını kayıt sırasında dolduramamışsa, prompt
+        // içeriğinden ("...20000 TL...") regex ile çıkarıp lokalde göster —
+        // kullanıcıya "Tutar girin" göstermek yerine zaten yazdığını
+        // tekrar yazdırmamış oluruz.
+        if (!data.amount && data.content) {
+          const m = data.content.match(/(\d[\d.,]*)\s*(tl|try|₺|lira)\b/i);
+          if (m) {
+            data.amount = m[0];
+          }
+        }
         setContract(data);
       } catch (err) {
         setError(friendlyError(err) || 'Sözleşme yüklenirken hata oluştu.');
@@ -255,6 +268,20 @@ const ContractDetailPage = ({ contractId, onBack }) => {
       setActionError(friendlyError(err) || 'Tutar güncellenemedi.');
     } finally {
       setSavingAmount(false);
+    }
+  };
+
+  const handleSaveContent = async () => {
+    setSavingContent(true);
+    setActionError(null);
+    try {
+      const updated = await contractService.update(contract.id, { content: contentDraft });
+      setContract(updated);
+      setEditingContent(false);
+    } catch (err) {
+      setActionError(friendlyError(err) || 'Sözleşme içeriği güncellenemedi.');
+    } finally {
+      setSavingContent(false);
     }
   };
 
@@ -445,20 +472,77 @@ const ContractDetailPage = ({ contractId, onBack }) => {
               </div>
             </Card>
 
-            {/* Sözleşme İçeriği */}
-            {contract.content && (
+            {/* Sözleşme İçeriği — DRAFT durumunda eksik maddeleri eklemek için
+                editlenebilir; APPROVED/REJECTED/PENDING ise read-only. */}
+            {(contract.content || canEditAmount) && (
               <Card style={{ padding: '24px', marginBottom: '24px' }} hover={false}>
-                <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Sözleşme İçeriği</h3>
-                <div style={{
-                  padding: '16px',
-                  background: colors.surfaceAlt,
-                  borderRadius: radius.md,
-                  fontSize: '14px',
-                  lineHeight: 1.7,
-                  whiteSpace: 'pre-wrap',
-                }}>
-                  {contract.content}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Sözleşme İçeriği</h3>
+                  {canEditAmount && !editingContent && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setContentDraft(contract.content || '');
+                        setEditingContent(true);
+                      }}
+                    >
+                      Düzenle
+                    </Button>
+                  )}
                 </div>
+                {editingContent ? (
+                  <>
+                    <textarea
+                      value={contentDraft}
+                      onChange={(e) => setContentDraft(e.target.value)}
+                      rows={10}
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        background: colors.surfaceAlt,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: radius.md,
+                        fontSize: '14px',
+                        lineHeight: 1.7,
+                        fontFamily: fonts.body,
+                        color: colors.text,
+                        outline: 'none',
+                        resize: 'vertical',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <p style={{ fontSize: '12px', color: colors.textMuted, marginTop: '8px', lineHeight: 1.5 }}>
+                      Eksik veya hatalı maddeleri doğrudan metin üzerinde düzeltebilirsiniz. Kaydettikten sonra
+                      yeniden PDF üretebilirsiniz.
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px', justifyContent: 'flex-end' }}>
+                      <Button
+                        variant="ghost"
+                        onClick={() => { setEditingContent(false); setContentDraft(''); }}
+                      >
+                        Vazgeç
+                      </Button>
+                      <Button
+                        variant="accent"
+                        onClick={handleSaveContent}
+                        loading={savingContent}
+                      >
+                        Kaydet
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{
+                    padding: '16px',
+                    background: colors.surfaceAlt,
+                    borderRadius: radius.md,
+                    fontSize: '14px',
+                    lineHeight: 1.7,
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    {contract.content || '(İçerik girilmemiş — Düzenle ile ekleyin)'}
+                  </div>
+                )}
               </Card>
             )}
 
@@ -478,6 +562,86 @@ const ContractDetailPage = ({ contractId, onBack }) => {
               )}
               {!loadingClauses && requiredClauses && requiredClauses.available !== false && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {/* Eksik zorunlu maddeler için Gemini'nin TBK gerekçeleri.
+                      Sözleşme oluşturulurken persiste edildi; her satır
+                      neden eksik + hangi TBK madde + risk seviyesi gösterir. */}
+                  {(requiredClauses.missingClauseExplanations || []).length > 0 && (
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: colors.error }}>
+                          Eksik Zorunlu Maddeler
+                        </span>
+                        {requiredClauses.explanationsFallback && (
+                          <span style={{
+                            fontSize: '10px', padding: '2px 8px',
+                            background: 'rgba(232, 200, 130, 0.20)',
+                            color: '#7a6535',
+                            borderRadius: '10px', fontWeight: 600,
+                          }}>
+                            AI servisi şu an erişilemiyor — temel uyarı gösterildi
+                          </span>
+                        )}
+                      </div>
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {(requiredClauses.missingClauseExplanations || []).map((m, i) => {
+                          const fieldName = m.field || `(alan ${i + 1})`;
+                          const sev = m.riskLevel || 'MEDIUM';
+                          const sevColor = sev === 'HIGH' ? colors.error
+                            : sev === 'MEDIUM' ? colors.warning : colors.textMuted;
+                          const sevLabel = sev === 'HIGH' ? 'YÜKSEK'
+                            : sev === 'MEDIUM' ? 'ORTA' : 'DÜŞÜK';
+                          // Backend'den gelen artikül numarası birden çok formatta
+                          // gelebilir (Integer, "342", "TBK 342"); normalize et.
+                          const rawArt = m.tbkArticle;
+                          const articleStr = rawArt && String(rawArt).trim() !== ''
+                            ? `TBK Madde ${String(rawArt).replace(/[^0-9]/g, '') || rawArt}`
+                            : 'İlgili kanun maddesi tespit edilemedi';
+                          // lawArticles içinde eşleşen bir madde varsa özetini de göster
+                          const matchedLaw = (requiredClauses.lawArticles || []).find(
+                            a => String(a.article_number || '').replace(/[^0-9]/g, '')
+                              === String(rawArt || '').replace(/[^0-9]/g, '')
+                          );
+                          return (
+                            <li key={`mx-${i}`} style={{
+                              padding: '10px 12px',
+                              background: 'rgba(220, 53, 69, 0.06)',
+                              border: `1px solid ${sevColor}33`,
+                              borderRadius: radius.md,
+                              fontSize: '13px',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 700, color: colors.text }}>{fieldName}</span>
+                                <span style={{
+                                  fontSize: '10px', fontWeight: 700, padding: '2px 6px',
+                                  background: sevColor + '22', color: sevColor, borderRadius: '4px',
+                                }}>
+                                  {sevLabel}
+                                </span>
+                                <span style={{ fontSize: '11px', color: colors.textMuted, marginLeft: 'auto' }}>
+                                  {articleStr}
+                                </span>
+                              </div>
+                              {m.explanation && (
+                                <div style={{ fontSize: '12px', color: colors.textSecondary, lineHeight: 1.5, marginBottom: m.suggestion ? '4px' : 0 }}>
+                                  {m.explanation}
+                                </div>
+                              )}
+                              {m.suggestion && (
+                                <div style={{ fontSize: '11px', color: colors.textMuted, lineHeight: 1.5, fontStyle: 'italic' }}>
+                                  Öneri: {m.suggestion}
+                                </div>
+                              )}
+                              {matchedLaw?.summary && (
+                                <div style={{ fontSize: '11px', color: colors.textMuted, marginTop: '4px', borderTop: `1px dashed ${colors.border}`, paddingTop: '4px' }}>
+                                  {matchedLaw.law_name} {matchedLaw.article_number}: {matchedLaw.summary}
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: colors.text }}>
                       Zorunlu Maddeler
