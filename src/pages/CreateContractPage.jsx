@@ -82,6 +82,11 @@ const CreateContractPage = ({ onNavigate }) => {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [selectedClauses, setSelectedClauses] = useState([]);
   const [missingFieldValues, setMissingFieldValues] = useState({});
+  // Seçilen önerilen maddelere kullanıcının verdiği değerler — eskiden sadece
+  // suggestion.description ("Aylık brüt ücret nedir?") PDF'e eklenirdi ve
+  // "soru olarak" sözleşmeye giriyordu. Artık seçili her madde için input
+  // çıkıyor; kullanıcı değeri yazınca "{label}: {value}" olarak ekleniyor.
+  const [suggestedFieldValues, setSuggestedFieldValues] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [contractId, setContractId] = useState(null);
@@ -267,12 +272,19 @@ const CreateContractPage = ({ onNavigate }) => {
       content += '\n\n' + additions;
     }
 
-    // Seçilen önerilen maddeler — ayraç başlık olmadan ekle
+    // Seçilen önerilen maddeler — kullanıcının girdiği değer varsa onu kullan;
+    // değer girmediyse "[belirtilecek]" yer tutucusu ile ekle. Önceden direkt
+    // `s.description` (soru cümlesi) PDF'e eklendiği için sözleşme içine
+    // "Aylık brüt ücret nedir?" gibi sorular giriyordu.
     const suggestions = analysisResult?.suggestedClauses || [];
     const selected = suggestions.filter(s => selectedClauses.includes(s.id));
     if (selected.length > 0) {
       const additions = selected
-        .map(s => `${labelForClause(s.id) || s.name}: ${s.description}`)
+        .map(s => {
+          const v = (suggestedFieldValues[s.id] || '').trim();
+          const label = labelForClause(s.id) || s.name;
+          return `${label}: ${v || '[belirtilecek]'}`;
+        })
         .join('\n');
       content += '\n\n' + additions;
     }
@@ -370,6 +382,7 @@ const CreateContractPage = ({ onNavigate }) => {
     setAnalysisResult(null);
     setSelectedClauses([]);
     setMissingFieldValues({});
+    setSuggestedFieldValues({});
     setSaveError('');
     setContractId(null);
     setPdfBlobUrl(null);
@@ -630,13 +643,14 @@ const CreateContractPage = ({ onNavigate }) => {
                 style={{
                   padding: '14px 16px',
                   marginBottom: '10px',
-                  cursor: 'pointer',
                   border: `1.5px solid ${isChecked ? colors.primary : colors.border}`,
                   transition: 'border-color 0.2s ease',
                 }}
-                onClick={() => toggleClause(clause.id)}
               >
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                <div
+                  onClick={() => toggleClause(clause.id)}
+                  style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer' }}
+                >
                   {/* Özel Checkbox */}
                   <div style={{
                     width: '18px',
@@ -672,6 +686,32 @@ const CreateContractPage = ({ onNavigate }) => {
                     </div>
                   </div>
                 </div>
+                {/* Seçildiğinde kullanıcıdan bu madde için değer iste — boş
+                    bırakılırsa PDF'te "[belirtilecek]" olarak kalır. */}
+                {isChecked && (
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px dashed ${colors.border}` }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: colors.textSecondary, marginBottom: '6px' }}>
+                      {clause.name} değeri
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={placeholderForClause(clause.id) || `${clause.name} bilgisini girin`}
+                      value={suggestedFieldValues[clause.id] || ''}
+                      onChange={(e) => setSuggestedFieldValues(prev => ({ ...prev, [clause.id]: e.target.value }))}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        width: '100%', padding: '9px 12px',
+                        background: colors.surfaceAlt,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: radius.md, color: colors.text,
+                        fontFamily: fonts.body, fontSize: '13px',
+                        outline: 'none', boxSizing: 'border-box',
+                      }}
+                      onFocus={e => { e.target.style.borderColor = colors.accent; }}
+                      onBlur={e => { e.target.style.borderColor = colors.border; }}
+                    />
+                  </div>
+                )}
               </Card>
             );
           })}
