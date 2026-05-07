@@ -93,7 +93,6 @@ const SettingsPage = ({ onLogout }) => {
     push: true,
     contractUpdates: true,
     approvalRequests: true,
-    marketing: false,
   });
 
   const [passwordForm, setPasswordForm] = useState({
@@ -113,7 +112,6 @@ const SettingsPage = ({ onLogout }) => {
           push: !!data.push,
           contractUpdates: !!data.contractUpdates,
           approvalRequests: !!data.approvalRequests,
-          marketing: !!data.marketing,
         });
       })
       .catch(() => {
@@ -393,8 +391,7 @@ const SettingsPage = ({ onLogout }) => {
       </div>
       <Card style={{ padding: '0 20px' }} hover={false}>
         <SettingRow label="Sözleşme Güncellemeleri" description="Sözleşmelerinizle ilgili değişiklikler" checked={notifications.contractUpdates} onToggle={() => toggleSetting('contractUpdates')} />
-        <SettingRow label="Onay Talepleri" description="Yeni onay bekleyen sözleşmeler" checked={notifications.approvalRequests} onToggle={() => toggleSetting('approvalRequests')} />
-        <SettingRow label="Pazarlama" description="Yenilikler ve kampanyalar" checked={notifications.marketing} onToggle={() => toggleSetting('marketing')} isLast />
+        <SettingRow label="Onay Talepleri" description="Yeni onay bekleyen sözleşmeler" checked={notifications.approvalRequests} onToggle={() => toggleSetting('approvalRequests')} isLast />
       </Card>
 
       {notifSaveSuccess && (
