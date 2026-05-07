@@ -135,9 +135,17 @@ const SettingsPage = ({ onLogout }) => {
     setSaveSuccess(false);
     setSaveError('');
     try {
-      const nameParts = profile.name.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+      // İsim ayrıştırma: 2+ kelimeli adlarda son kelime soyadıdır,
+      // önceki kelimeler "ad" olarak kalır (örn. "Enes Burak Atay").
+      const nameParts = profile.name.trim().split(/\s+/).filter(Boolean);
+      let firstName = '';
+      let lastName = '';
+      if (nameParts.length === 1) {
+        firstName = nameParts[0];
+      } else if (nameParts.length >= 2) {
+        firstName = nameParts.slice(0, -1).join(' ');
+        lastName = nameParts[nameParts.length - 1];
+      }
 
       await api.put('/api/users/me', {
         firstName,
