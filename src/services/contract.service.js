@@ -17,6 +17,9 @@ const contractService = {
   downloadPdf: (id) => api.getBlob(`/api/contracts/${id}/pdf`),
   getPdfConfirm: (id) => api.get(`/api/contracts/${id}/pdf-confirm`),
   getRequiredClauses: (id) => api.get(`/api/contracts/${id}/required-clauses`),
+  // Sözleşme oluşturulmadan önce (preview adımında) tip bazında zorunlu/opsiyonel
+  // madde rehberini almak için.
+  getRequiredClausesByType: (type) => api.get(`/api/contracts/clauses/${type}`),
 };
 
 export default contractService;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TopBar } from '../components/layout';
-import { Card, Button, Badge } from '../components/ui';
+import { Card, Button, Badge, ConfirmDialog } from '../components/ui';
 import { colors, radius } from '../styles/tokens';
 import contractService from '../services/contract.service';
 import verificationService from '../services/verification.service';
@@ -16,6 +16,11 @@ const ApprovalsPage = ({ onNavigate }) => {
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isVerified, setIsVerified] = useState(null); // null = yükleniyor
+  // Onay/ret tek tıkla anında işlem yapmasın diye iki adımlı confirm —
+  // kullanıcı yanlışlıkla "Onayla"ya basınca sözleşme APPROVED'a gitmesin.
+  const [confirmAction, setConfirmAction] = useState(null); // { type, contract }
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -43,27 +48,57 @@ const ApprovalsPage = ({ onNavigate }) => {
     return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  const handleApprove = async (id) => {
+  const performAction = async () => {
+    if (!confirmAction) return;
+    const { type, contract } = confirmAction;
+    setActionLoading(true);
+    setActionError(null);
     try {
-      await contractService.approve(id);
-      setPending(prev => prev.filter(p => p.id !== id));
+      if (type === 'approve') {
+        await contractService.approve(contract.id);
+      } else {
+        await contractService.reject(contract.id);
+      }
+      setPending(prev => prev.filter(p => p.id !== contract.id));
+      setConfirmAction(null);
     } catch (error) {
-      console.error('Approve error:', error);
-    }
-  };
-
-  const handleReject = async (id) => {
-    try {
-      await contractService.reject(id);
-      setPending(prev => prev.filter(p => p.id !== id));
-    } catch (error) {
-      console.error('Reject error:', error);
+      const msg = error?.response?.data?.message || error?.message || 'İşlem başarısız.';
+      setActionError(msg);
+    } finally {
+      setActionLoading(false);
     }
   };
 
   return (
     <div style={{ animation: 'fadeInUp 0.35s ease' }}>
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.type === 'approve' ? 'Sözleşmeyi Onayla' : 'Sözleşmeyi Reddet'}
+        message={
+          confirmAction
+            ? (confirmAction.type === 'approve'
+                ? `"${confirmAction.contract.title}" sözleşmesini onaylamak istediğinize emin misiniz? Bu işlem geri alınamaz.`
+                : `"${confirmAction.contract.title}" sözleşmesini reddetmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)
+            : ''
+        }
+        confirmLabel={confirmAction?.type === 'approve' ? 'Evet, Onayla' : 'Evet, Reddet'}
+        cancelLabel="Vazgeç"
+        variant={confirmAction?.type === 'approve' ? 'accent' : 'danger'}
+        loading={actionLoading}
+        onConfirm={performAction}
+        onCancel={() => { setConfirmAction(null); setActionError(null); }}
+      />
       <TopBar title="Onay Bekleyenler" subtitle={`${pending.length} sözleşme onayınızı bekliyor`} onNavigate={onNavigate} />
+      {actionError && (
+        <div style={{
+          margin: '12px 32px 0', padding: '10px 14px',
+          background: 'rgba(220,53,69,0.08)',
+          border: `1px solid ${colors.error}`,
+          borderRadius: '8px', fontSize: '12px', color: colors.error,
+        }}>
+          {actionError}
+        </div>
+      )}
 
       <div style={{ padding: '28px 32px' }}>
         {/* Kimlik doğrulama uyarısı */}
@@ -134,7 +169,7 @@ const ApprovalsPage = ({ onNavigate }) => {
                   <Button
                     variant="success"
                     size="sm"
-                    onClick={() => handleApprove(p.id)}
+                    onClick={() => setConfirmAction({ type: 'approve', contract: p })}
                     disabled={isVerified === false}
                     title={isVerified === false ? 'Kimlik doğrulaması gerekli' : ''}
                   >
@@ -144,7 +179,7 @@ const ApprovalsPage = ({ onNavigate }) => {
                     variant="ghost"
                     size="sm"
                     style={{ color: colors.error }}
-                    onClick={() => handleReject(p.id)}
+                    onClick={() => setConfirmAction({ type: 'reject', contract: p })}
                     disabled={isVerified === false}
                     title={isVerified === false ? 'Kimlik doğrulaması gerekli' : ''}
                   >
