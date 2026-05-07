@@ -209,13 +209,37 @@ const CreateContractPage = ({ onNavigate }) => {
         if (r && r.field) risksByField[r.field] = r;
       });
 
+      // NLP'nin yakaladığı PERSON entity'leri zaten yazılı taraf olduğu halde
+      // GraphRAG bazen taraf alanlarını "eksik" olarak işaretliyor. Sözleşme
+      // tipine göre PERSON varlığını uygun karşı-taraf alanına eşle ve
+      // missingClauses listesinden çıkar.
+      const counterpartyFieldsByType = {
+        borc_sozlesmesi: ['taraf_borclu', 'borclu'],
+        kira_sozlesmesi: ['taraf_kiraci', 'kiraci'],
+        hizmet_sozlesmesi: ['taraf_hizmet_veren', 'hizmet_veren'],
+        satis_sozlesmesi: ['taraf_alici', 'alici'],
+        is_sozlesmesi: ['taraf_isci', 'taraf_calisan', 'isci', 'calisan'],
+        vekaletname: ['taraf_vekil', 'vekil'],
+        taahhutname: ['taraf_taahhut_eden', 'taahhut_eden'],
+      };
+      const tipKey = (realResult.contract_type || '').toLowerCase();
+      const counterpartyFieldIds = new Set(counterpartyFieldsByType[tipKey] || []);
+      const hasPerson = persons && persons.length > 0;
+
+      const filteredMissing = hasPerson
+        ? missing.filter(f => {
+            const id = (typeof f === 'string' ? f : (f.field_name || f.id || f.name || '')).toLowerCase();
+            return !counterpartyFieldIds.has(id);
+          })
+        : missing;
+
       setAnalysisResult({
         contractType: realResult.contract_type_display?.replace(/_/g, ' ') || realResult.contract_type,
         contractTypeEn: realResult.contract_type,
         confidence: realResult.confidence || 0,
         entities: entityList,
         mandatoryClauses: matched.map(normalizeClause),
-        missingClauses: missing.map(f => {
+        missingClauses: filteredMissing.map(f => {
           const base = normalizeClause(f);
           const risk = risksByField[base.id];
           return {
