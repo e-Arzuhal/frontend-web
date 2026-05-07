@@ -914,7 +914,7 @@ const CreateContractPage = ({ onNavigate }) => {
                         padding: '6px 8px', background: colors.successBg,
                         borderRadius: radius.md, fontSize: '12px',
                       }}>
-                        <strong style={{ color: colors.text }}>{c.name || c.clause || `Madde ${i + 1}`}</strong>
+                        <strong style={{ color: colors.text }}>{labelForClause(c.name || c.clause) || `Madde ${i + 1}`}</strong>
                       </li>
                     ))}
                   </ul>
@@ -931,7 +931,7 @@ const CreateContractPage = ({ onNavigate }) => {
                         padding: '6px 8px', background: colors.surfaceAlt,
                         borderRadius: radius.md, fontSize: '12px',
                       }}>
-                        {c.name || c.clause || `Madde ${i + 1}`}
+                        {labelForClause(c.name || c.clause) || `Madde ${i + 1}`}
                       </li>
                     ))}
                   </ul>

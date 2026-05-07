@@ -3,6 +3,7 @@ import { TopBar } from '../components/layout';
 import { Card, Button, Badge, ProgressBar, ConfirmDialog } from '../components/ui';
 import { colors, fonts, radius } from '../styles/tokens';
 import contractService from '../services/contract.service';
+import { labelForClause } from '../utils/clauseLabels';
 
 const friendlyError = (err) => {
   const raw = err?.response?.data?.message || err?.message || '';
@@ -584,7 +585,7 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                       </div>
                       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {(requiredClauses.missingClauseExplanations || []).map((m, i) => {
-                          const fieldName = m.field || `(alan ${i + 1})`;
+                          const fieldName = m.field ? labelForClause(m.field) : `(alan ${i + 1})`;
                           const sev = m.riskLevel || 'MEDIUM';
                           const sevColor = sev === 'HIGH' ? colors.error
                             : sev === 'MEDIUM' ? colors.warning : colors.textMuted;
@@ -657,7 +658,7 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                             borderRadius: radius.md,
                             fontSize: '13px',
                           }}>
-                            <div style={{ fontWeight: 600, color: colors.text }}>{c.name || c.clause || `Madde ${i + 1}`}</div>
+                            <div style={{ fontWeight: 600, color: colors.text }}>{labelForClause(c.name || c.clause) || `Madde ${i + 1}`}</div>
                             {c.description && (
                               <div style={{ fontSize: '12px', color: colors.textSecondary, marginTop: '4px' }}>
                                 {c.description}
@@ -681,7 +682,7 @@ const ContractDetailPage = ({ contractId, onBack }) => {
                             borderRadius: radius.md,
                             fontSize: '13px',
                           }}>
-                            <div style={{ fontWeight: 600, color: colors.text }}>{c.name || c.clause || `Madde ${i + 1}`}</div>
+                            <div style={{ fontWeight: 600, color: colors.text }}>{labelForClause(c.name || c.clause) || `Madde ${i + 1}`}</div>
                             {c.description && (
                               <div style={{ fontSize: '12px', color: colors.textSecondary, marginTop: '4px' }}>
                                 {c.description}
